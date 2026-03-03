@@ -15,6 +15,7 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -436,29 +437,31 @@ function OpenInAppBanner({onDismiss}) {
 // ─── AUTH SCREEN ─────────────────────────────────────────────────────────────
 function AuthScreen() {
   const [mode, setMode]         = useState('login');
-  const [username, setUsername] = useState('');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw]     = useState(false);
   const [loading, setLoading]   = useState(false);
   const [err, setErr]           = useState('');
+  const [resetSent, setResetSent] = useState(false);
 
   const handleSubmit = async () => {
     setErr('');
     if (mode === 'signup') {
-      if (!username.trim())    { setErr('Choose a username.'); return; }
       if (!email.trim())       { setErr('Enter your email.'); return; }
       if (password.length < 6) { setErr('Password must be at least 6 characters.'); return; }
       setLoading(true);
-      const { data, error: e } = await sb.auth.signUp({
-        email: email.trim(),
-        password,
-        options: { data: { username: username.trim() } }
-      });
+      const { data, error: e } = await sb.auth.signUp({ email: email.trim(), password });
       setLoading(false);
       if (e) { setErr(e.message); return; }
       if (!data.session) { setErr('✅ Check your email to confirm, then log in.'); return; }
       // session exists → onAuthStateChange fires → App moves to home
+    } else if (mode === 'reset') {
+      if (!email.trim()) { setErr('Enter your email.'); return; }
+      setLoading(true);
+      const { error: e } = await sb.auth.resetPasswordForEmail(email.trim());
+      setLoading(false);
+      if (e) { setErr(e.message); return; }
+      setResetSent(true);
     } else {
       if (!email.trim()) { setErr('Enter your email.'); return; }
       if (!password)     { setErr('Enter your password.'); return; }
@@ -476,52 +479,79 @@ function AuthScreen() {
         <div className="auth-hero-sub">Track your lifts.<br/>Own your progress.</div>
       </div>
       <div className="auth-body">
-        <div style={{display:'flex',background:'var(--bg2)',borderRadius:50,padding:4,gap:4}}>
-          {['login','signup'].map(m=>(
-            <button key={m} onClick={()=>{setMode(m);setErr('');}} style={{
-              flex:1,border:'none',borderRadius:50,padding:'12px',fontFamily:'Inter,sans-serif',
-              fontSize:14,fontWeight:800,cursor:'pointer',transition:'all 0.2s',
-              background:mode===m?'var(--text)':'transparent',
-              color:mode===m?'#fff':'var(--muted)',
-            }}>{m==='login'?'Log In':'Sign Up'}</button>
-          ))}
-        </div>
-
-        {err && <div className="auth-error">{err}</div>}
-
-        {mode==='signup' && (
-          <div>
-            <label className="auth-label">Username</label>
-            <input className="auth-input" type="text" placeholder="e.g. lifter_gal"
-              value={username} onChange={e=>setUsername(e.target.value)}
-              autoCapitalize="none" autoCorrect="off"/>
+        {mode !== 'reset' && (
+          <div style={{display:'flex',background:'var(--bg2)',borderRadius:50,padding:4,gap:4}}>
+            {['login','signup'].map(m=>(
+              <button key={m} onClick={()=>{setMode(m);setErr('');setResetSent(false);}} style={{
+                flex:1,border:'none',borderRadius:50,padding:'12px',fontFamily:'Inter,sans-serif',
+                fontSize:14,fontWeight:800,cursor:'pointer',transition:'all 0.2s',
+                background:mode===m?'var(--text)':'transparent',
+                color:mode===m?'#fff':'var(--muted)',
+              }}>{m==='login'?'Log In':'Sign Up'}</button>
+            ))}
           </div>
         )}
 
-        <div>
-          <label className="auth-label">Email</label>
-          <input className="auth-input" type="email" placeholder="your@email.com"
-            value={email} onChange={e=>setEmail(e.target.value)} autoCapitalize="none"/>
-        </div>
-
-        <div>
-          <label className="auth-label">Password</label>
-          <div style={{position:'relative'}}>
-            <input className="auth-input" type={showPw?'text':'password'}
-              placeholder={mode==='signup'?'Min 6 characters':'Your password'}
-              value={password} onChange={e=>setPassword(e.target.value)}
-              onKeyDown={e=>e.key==='Enter'&&handleSubmit()}
-              style={{paddingRight:52}}/>
-            <button onClick={()=>setShowPw(v=>!v)} style={{
-              position:'absolute',right:16,top:'50%',transform:'translateY(-50%)',
-              background:'none',border:'none',cursor:'pointer',fontSize:18,opacity:0.45,lineHeight:1,
-            }}>{showPw?'🙈':'👁️'}</button>
+        {mode === 'reset' && (
+          <div style={{textAlign:'center'}}>
+            <div style={{fontSize:20,fontWeight:900,letterSpacing:'-0.5px',marginBottom:4}}>Reset Password</div>
+            <div style={{fontSize:13,color:'var(--muted)',fontWeight:500}}>We'll send a reset link to your email</div>
           </div>
-        </div>
+        )}
 
-        <button className="auth-main-btn" onClick={handleSubmit} disabled={loading}>
-          {loading?'…':mode==='login'?'Log In →':'Create Account →'}
-        </button>
+        {err && <div className="auth-error">{err}</div>}
+
+        {resetSent ? (
+          <div style={{textAlign:'center',padding:'20px 0'}}>
+            <div style={{fontSize:32,marginBottom:12}}>📬</div>
+            <div style={{fontSize:15,fontWeight:700,marginBottom:8}}>Check your inbox</div>
+            <div style={{fontSize:13,color:'var(--muted)',marginBottom:20}}>We sent a password reset link to {email}</div>
+            <button onClick={()=>{setMode('login');setResetSent(false);setErr('');}} style={{
+              background:'none',border:'none',color:'var(--text)',fontSize:13,fontWeight:700,cursor:'pointer',textDecoration:'underline'
+            }}>Back to Log In</button>
+          </div>
+        ) : (<>
+          <div>
+            <label className="auth-label">Email</label>
+            <input className="auth-input" type="email" placeholder="your@email.com"
+              value={email} onChange={e=>setEmail(e.target.value)} autoCapitalize="none"/>
+          </div>
+
+          {mode !== 'reset' && (
+            <div>
+              <label className="auth-label">Password</label>
+              <div style={{position:'relative'}}>
+                <input className="auth-input" type={showPw?'text':'password'}
+                  placeholder={mode==='signup'?'Min 6 characters':'Your password'}
+                  value={password} onChange={e=>setPassword(e.target.value)}
+                  onKeyDown={e=>e.key==='Enter'&&handleSubmit()}
+                  style={{paddingRight:52}}/>
+                <button onClick={()=>setShowPw(v=>!v)} style={{
+                  position:'absolute',right:16,top:'50%',transform:'translateY(-50%)',
+                  background:'none',border:'none',cursor:'pointer',fontSize:18,opacity:0.45,lineHeight:1,
+                }}>{showPw?'🙈':'👁️'}</button>
+              </div>
+            </div>
+          )}
+
+          <button className="auth-main-btn" onClick={handleSubmit} disabled={loading}>
+            {loading?'…':mode==='login'?'Log In →':mode==='reset'?'Send Reset Link →':'Create Account →'}
+          </button>
+
+          {mode === 'login' && (
+            <button onClick={()=>{setMode('reset');setErr('');setResetSent(false);}} style={{
+              background:'none',border:'none',color:'var(--muted)',fontSize:13,fontWeight:600,
+              cursor:'pointer',textAlign:'center',width:'100%',padding:'4px 0',
+            }}>Forgot password?</button>
+          )}
+
+          {mode === 'reset' && (
+            <button onClick={()=>{setMode('login');setErr('');setResetSent(false);}} style={{
+              background:'none',border:'none',color:'var(--muted)',fontSize:13,fontWeight:600,
+              cursor:'pointer',textAlign:'center',width:'100%',padding:'4px 0',
+            }}>← Back to Log In</button>
+          )}
+        </>)}
       </div>
     </div>
   );
@@ -971,28 +1001,60 @@ function ProfileView({history,profile,userEmail,onEdit,onSignOut}) {
   const maxW=Math.max(...weeks,1);
   const catCounts={};history.forEach(w=>{catCounts[w.categoryId]=(catCounts[w.categoryId]||0)+1;});
   const initials=(profile?.name||'A').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const shareRef=React.useRef(null);
+  const [sharing,setSharing]=React.useState(false);
+
+  const handleShare=async()=>{
+    if(!shareRef.current||sharing)return;
+    setSharing(true);
+    try{
+      const canvas=await html2canvas(shareRef.current,{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false});
+      canvas.toBlob(async(blob)=>{
+        if(!blob){setSharing(false);return;}
+        const file=new File([blob],'coach-court-stats.jpg',{type:'image/jpeg'});
+        if(navigator.canShare&&navigator.canShare({files:[file]})){
+          try{await navigator.share({files:[file],title:'My Coach Court Stats'});}catch(e){/* cancelled */}
+        } else {
+          const url=URL.createObjectURL(blob);
+          const a=document.createElement('a');a.href=url;a.download='coach-court-stats.jpg';a.click();
+          setTimeout(()=>URL.revokeObjectURL(url),1000);
+        }
+        setSharing(false);
+      },'image/jpeg',0.92);
+    }catch(e){setSharing(false);}
+  };
+
   return (<>
-    <div className="profile-hero" style={{background:COLORS.upper.bg}}>
-      <div className="avatar" onClick={onEdit}>{profile?.photo?<img src={profile.photo} alt=""/>:initials}</div>
-      <div style={{flex:1,minWidth:0}}>
-        <div className="profile-name" style={{color:COLORS.upper.text}}>{profile?.name||'Athlete'}</div>
-        <div className="profile-since" style={{color:COLORS.upper.text}}>Since {profile?.since||'—'}</div>
-        {userEmail&&<div className="profile-email" style={{color:COLORS.upper.text}}>{userEmail}</div>}
+    <div ref={shareRef} style={{background:'#fff',padding:'4px 0'}}>
+      <div className="profile-hero" style={{background:COLORS.upper.bg}}>
+        <div className="avatar" onClick={onEdit}>{profile?.photo?<img src={profile.photo} alt=""/>:initials}</div>
+        <div style={{flex:1,minWidth:0}}>
+          <div className="profile-name" style={{color:COLORS.upper.text}}>{profile?.name||'Athlete'}</div>
+          <div className="profile-since" style={{color:COLORS.upper.text}}>Since {profile?.since||'—'}</div>
+        </div>
+        <button className="edit-btn" onClick={onEdit} style={{color:COLORS.upper.text}}>Edit</button>
       </div>
-      <button className="edit-btn" onClick={onEdit} style={{color:COLORS.upper.text}}>Edit</button>
+      <div className="big-stats">
+        <div className="big-stat" style={{background:COLORS.lower.bg}}><div className="big-stat-num" style={{color:COLORS.lower.text}}>{total}</div><div className="big-stat-lbl" style={{color:COLORS.lower.text}}>Workouts</div></div>
+        <div className="big-stat" style={{background:COLORS.fullbody.bg}}><div className="big-stat-num" style={{color:COLORS.fullbody.text}}>{streak}🔥</div><div className="big-stat-lbl" style={{color:COLORS.fullbody.text}}>Streak</div></div>
+        <div className="big-stat" style={{background:COLORS.cardio.bg}}><div className="big-stat-num" style={{color:COLORS.cardio.text}}>{Math.round(totalMins/60)}h</div><div className="big-stat-lbl" style={{color:COLORS.cardio.text}}>Hours</div></div>
+        <div className="big-stat" style={{background:'var(--bg2)'}}><div className="big-stat-num">{total>0?Math.round(totalMins/total):0}m</div><div className="big-stat-lbl">Avg</div></div>
+      </div>
+      <div className="chart-block">
+        <div className="chart-title">Workouts per Week</div>
+        <div className="chart-bars">{weeks.map((w,i)=><div key={i} className="bar-wrap"><div className="bar" style={{height:`${(w/maxW)*100}%`,background:i%2===0?COLORS.upper.bg:COLORS.lower.bg}}/><div className="bar-lbl">W{i+1}</div></div>)}</div>
+      </div>
+      <div style={{fontSize:20,fontWeight:900,letterSpacing:'-0.5px',margin:'14px 0 12px'}}>By Category</div>
+      <div className="breakdown">{Object.entries(CATEGORIES).map(([k,v])=><div key={k} className="breakdown-tile"><div className="bd-emoji">{v.emoji}</div><div><div className="bd-num" style={{color:COLORS[k].bg==='#D4F54A'?'#5A7A00':COLORS[k].bg==='#C4A8FF'?'#7C4DFF':COLORS[k].bg}}>{catCounts[k]||0}</div><div className="bd-lbl">{v.label}</div></div></div>)}</div>
+      <div style={{fontSize:10,fontWeight:700,textAlign:'center',letterSpacing:'1px',color:'var(--muted)',opacity:0.5,marginTop:12,textTransform:'uppercase'}}>Coach Court</div>
     </div>
-    <div className="big-stats">
-      <div className="big-stat" style={{background:COLORS.lower.bg}}><div className="big-stat-num" style={{color:COLORS.lower.text}}>{total}</div><div className="big-stat-lbl" style={{color:COLORS.lower.text}}>Workouts</div></div>
-      <div className="big-stat" style={{background:COLORS.fullbody.bg}}><div className="big-stat-num" style={{color:COLORS.fullbody.text}}>{streak}🔥</div><div className="big-stat-lbl" style={{color:COLORS.fullbody.text}}>Streak</div></div>
-      <div className="big-stat" style={{background:COLORS.cardio.bg}}><div className="big-stat-num" style={{color:COLORS.cardio.text}}>{Math.round(totalMins/60)}h</div><div className="big-stat-lbl" style={{color:COLORS.cardio.text}}>Hours</div></div>
-      <div className="big-stat" style={{background:'var(--bg2)'}}><div className="big-stat-num">{total>0?Math.round(totalMins/total):0}m</div><div className="big-stat-lbl">Avg</div></div>
-    </div>
-    <div className="chart-block">
-      <div className="chart-title">Workouts per Week</div>
-      <div className="chart-bars">{weeks.map((w,i)=><div key={i} className="bar-wrap"><div className="bar" style={{height:`${(w/maxW)*100}%`,background:i%2===0?COLORS.upper.bg:COLORS.lower.bg}}/><div className="bar-lbl">W{i+1}</div></div>)}</div>
-    </div>
-    <div style={{fontSize:20,fontWeight:900,letterSpacing:'-0.5px',margin:'14px 0 12px'}}>By Category</div>
-    <div className="breakdown">{Object.entries(CATEGORIES).map(([k,v])=><div key={k} className="breakdown-tile"><div className="bd-emoji">{v.emoji}</div><div><div className="bd-num" style={{color:COLORS[k].bg==='#D4F54A'?'#5A7A00':COLORS[k].bg==='#C4A8FF'?'#7C4DFF':COLORS[k].bg}}>{catCounts[k]||0}</div><div className="bd-lbl">{v.label}</div></div></div>)}</div>
+
+    <button onClick={handleShare} disabled={sharing} style={{
+      width:'100%',border:'none',borderRadius:18,padding:'16px',marginTop:14,
+      background:'var(--text)',color:'#fff',fontSize:15,fontWeight:800,cursor:'pointer',
+      fontFamily:'Inter,sans-serif',display:'flex',alignItems:'center',justifyContent:'center',gap:8,
+      opacity:sharing?0.6:1,transition:'opacity 0.2s',
+    }}>{sharing?'Generating…':'📤 Share Stats'}</button>
 
     <div style={{fontSize:20,fontWeight:900,letterSpacing:'-0.5px',margin:'20px 0 12px'}}>Account</div>
     <div className="settings-section">
@@ -1151,7 +1213,7 @@ function App() {
     {!nav&&(
       <div className="nav-wrap">
         <div className="nav-inner">
-          {[{key:'home',icon:'🏠',label:'Home'},{key:'calendar',icon:'📅',label:'Log'},{key:'profile',icon:'📊',label:'Stats'}].map(({key,icon,label})=>(
+          {[{key:'home',icon:'🏠',label:'Home'},{key:'calendar',icon:'📅',label:'Log'},{key:'profile',icon:'📊',label:'Account'}].map(({key,icon,label})=>(
             <button key={key} className={`nav-btn ${tab===key?'active':''}`} onClick={()=>{setTab(key);setNav(null);}}>
               <div className="nav-icon">{icon}</div>
               <div className="nav-label">{label}</div>
