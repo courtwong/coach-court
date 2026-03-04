@@ -307,6 +307,34 @@
     .emoji-opt.selected { border-color:var(--text); background:var(--text); }
     .divider { height:1px; background:var(--border); margin:16px 0; }
     .error-bar { background:#FFF0F0; border:1.5px solid #FFB3B3; border-radius:12px; padding:10px 16px; margin:10px 20px 0; font-size:12px; font-weight:700; color:#CC0000; text-align:center; }
+
+    /* SETTINGS */
+    .settings-section { background:var(--bg2); border-radius:20px; overflow:hidden; margin-bottom:14px; }
+    .settings-row { display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--border); }
+    .settings-row:last-child { border-bottom:none; }
+    .settings-label { font-size:14px; font-weight:700; }
+    .settings-sub { font-size:12px; color:var(--muted); margin-top:2px; }
+    .settings-action { border:none; border-radius:50px; padding:8px 16px; font-family:'Inter',sans-serif; font-size:13px; font-weight:700; cursor:pointer; }
+    .settings-action.danger { background:#FFF0F0; color:#CC0000; }
+
+    /* KITCHEN / RECIPES */
+    .cook-ing-card { background:var(--bg2); border-radius:16px; padding:14px 16px; margin-bottom:16px; border:1.5px solid var(--border); }
+    .cook-ing-title { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:10px; }
+    .cook-ing-row { display:flex; align-items:center; gap:10px; margin-bottom:7px; }
+    .cook-ing-row:last-child { margin-bottom:0; }
+    .cook-ing-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
+    .cook-ing-text { font-size:13px; font-weight:700; }
+    .timer-start-btn { width:100%; border:none; border-radius:50px; padding:14px; font-family:'Inter',sans-serif; font-size:14px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:12px; }
+    .cook-step-instr { font-size:21px; font-weight:800; letter-spacing:-0.5px; line-height:1.4; margin-bottom:18px; }
+    .photo-capture-card { background:var(--bg2); border-radius:20px; padding:18px; margin:8px 0; width:100%; }
+    .photo-capture-title { font-size:13px; font-weight:800; margin-bottom:10px; text-align:center; }
+    .photo-capture-btn { width:100%; border:2.5px dashed; border-radius:16px; padding:20px; background:transparent; font-family:'Inter',sans-serif; font-size:14px; font-weight:700; cursor:pointer; }
+    .photo-preview-img { width:100%; border-radius:14px; object-fit:cover; height:200px; display:block; margin-bottom:8px; }
+    .retake-lnk { background:none; border:none; font-size:12px; font-weight:700; color:var(--muted); cursor:pointer; font-family:'Inter',sans-serif; display:block; margin:0 auto; }
+    .recipe-ing-item { display:flex; gap:8px; margin-bottom:5px; align-items:flex-start; }
+    .recipe-ing-num { font-size:11px; font-weight:700; min-width:18px; line-height:1.5; }
+    .recipe-ing-text { font-size:12px; font-weight:600; line-height:1.4; }
+
     /* OPEN IN APP BANNER */
     .open-in-app-banner { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); width:calc(100% - 40px); max-width:390px; background:#1A1A1A; border-radius:20px; padding:14px 18px; display:flex; align-items:center; gap:12px; z-index:500; box-shadow:0 8px 32px rgba(0,0,0,0.25); animation:slideUpBanner 0.4s cubic-bezier(0.34,1.2,0.64,1); }
     @keyframes slideUpBanner { from{opacity:0;transform:translateX(-50%) translateY(20px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
@@ -335,7 +363,35 @@ const COLORS = {
   lower:    { bg:'#D4F54A', text:'#1E2800' },
   cardio:   { bg:'#3D5AFE', text:'#FFFFFF' },
   fullbody: { bg:'#FF5722', text:'#FFFFFF' },
+  kitchen:  { bg:'#4ECDC4', text:'#FFFFFF' },
 };
+
+const RECIPES = [
+  {
+    id: 'ginger-chicken-soup',
+    label: 'Ginger Chicken Rice Soup',
+    emoji: '🍲',
+    custom: false,
+    ingredients: [
+      '1 pound boneless, skinless chicken thighs',
+      'Salt & pepper',
+      '2 tablespoons neutral oil',
+      '2 tablespoons minced ginger',
+      '4 garlic cloves, minced',
+      '2 teaspoons ground turmeric',
+      '½ cup rice',
+      '1 large zucchini, diced',
+      'Chili crisp, lemon & cilantro (for serving)',
+    ],
+    steps: [
+      { id:1, instruction:'Pat chicken thighs dry and season with salt and pepper.', stepIngredients:['1 pound boneless, skinless chicken thighs','Salt & pepper'], timerSeconds:null },
+      { id:2, instruction:'Heat large pot over medium. Add oil, ginger, garlic, and turmeric and let mixture sizzle and soften for 30 seconds. Stir constantly.', stepIngredients:['2 tablespoons neutral oil','2 tablespoons minced ginger','4 garlic cloves, minced','2 teaspoons ground turmeric'], timerSeconds:30 },
+      { id:3, instruction:'Add 6 cups water to the pot, along with chicken, rice, zucchini, and salt. Bring to a simmer, then turn heat down to low and cook for 30 minutes. Stir occasionally.', stepIngredients:['½ cup rice','1 large zucchini, diced'], timerSeconds:1800 },
+      { id:4, instruction:'Remove chicken and place on a cutting board. Use two forks to shred and return meat to the pot. Taste & season with salt and pepper.', stepIngredients:[], timerSeconds:null },
+      { id:5, instruction:'Serve in bowls and top with chili crisp, lemon, and cilantro.', stepIngredients:['Chili crisp, lemon & cilantro (for serving)'], timerSeconds:null },
+    ],
+  },
+];
 
 // Equipment tags per exercise — extend as needed
 const EXERCISE_EQUIPMENT = {
@@ -398,6 +454,7 @@ const sNames = s => s.type==='superset' ? s.names : [s.name];
 const sLabel = s => s.type==='superset' ? s.names.join(' + ') : s.name;
 const buildSeq = steps => { const q=[]; steps.forEach((s,si)=>{ for(let i=0;i<s.sets;i++) q.push({stepIdx:si,setIdx:i}); }); return q; };
 const getWorkout = (cId,wId,custom) => CATEGORIES[cId]?.workouts.find(w=>w.id===wId)||(custom||[]).find(w=>w.id===wId)||null;
+const getRecipe = (id,custom) => RECIPES.find(r=>r.id===id)||(custom||[]).find(r=>r.id===id)||null;
 const uid = () => Math.random().toString(36).slice(2,9);
 
 const loadData = async () => {
@@ -581,6 +638,120 @@ function RestScreen({seconds,restType,nextName,color,onDone}) {
   );
 }
 
+// ─── COOKING TIMER ────────────────────────────────────────────────────────────
+function CookingTimer({seconds,stepLabel,onDone}) {
+  const [left,setLeft]=useState(seconds);
+  const total=useRef(seconds);
+  useEffect(()=>{ if(left<=0){onDone();return;} const t=setTimeout(()=>setLeft(l=>l-1),1000); return()=>clearTimeout(t); },[left]);
+  const pct=left/total.current,r=90,circ=2*Math.PI*r;
+  return (
+    <div className="rest-screen" style={{background:'#1A8080'}}>
+      <div className="rest-tag">⏱ Timer Running</div>
+      <div className="rest-next-name" style={{fontSize:14,padding:'0 32px',lineHeight:1.5}}>{stepLabel}</div>
+      <div className="rest-ring-wrap">
+        <svg className="rest-ring" viewBox="0 0 220 220">
+          <circle cx="110" cy="110" r={r} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="8"/>
+          <circle cx="110" cy="110" r={r} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="8" strokeDasharray={circ} strokeDashoffset={circ*(1-pct)} strokeLinecap="round" transform="rotate(-90 110 110)" style={{transition:'stroke-dashoffset 1s linear'}}/>
+        </svg>
+        <div className="rest-timer-inner"><div className="rest-lbl">Remaining</div><div className="rest-time">{fmt(left)}</div></div>
+      </div>
+      <button className="skip-btn" onClick={onDone}>Skip Timer</button>
+    </div>
+  );
+}
+
+// ─── COOKING FLOW ─────────────────────────────────────────────────────────────
+function CookingFlow({recipeId,onFinish,onBack,customRecipes}) {
+  const recipe=getRecipe(recipeId,customRecipes);
+  const steps=recipe.steps;
+  const [stepIdx,setStepIdx]=useState(0);
+  const [phase,setPhase]=useState('step'); // 'step','timer','done'
+  const [photo,setPhoto]=useState(null);
+  const photoRef=useRef();
+  const startTime=useRef(Date.now());
+  const curStep=steps[stepIdx];
+  const isLast=stepIdx>=steps.length-1;
+  const nextStep=steps[stepIdx+1];
+  const pct=(stepIdx/steps.length)*100;
+  const handleNext=()=>{ if(isLast) setPhase('done'); else setStepIdx(i=>i+1); };
+  const handlePhoto=e=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>setPhoto(ev.target.result); r.readAsDataURL(f); };
+
+  if(phase==='done'){
+    const mins=Math.max(1,Math.round((Date.now()-startTime.current)/60000));
+    return (
+      <div className="finish-screen">
+        <div className="finish-emoji">🍴</div>
+        <div className="finish-title">Enjoy your meal!</div>
+        <div className="finish-sub">{recipe.emoji} {recipe.label}</div>
+        <div className="finish-stats">
+          <div className="f-stat"><div className="f-num" style={{color:'#4ECDC4'}}>{steps.length}</div><div className="f-lbl">Steps</div></div>
+          <div className="f-stat"><div className="f-num" style={{color:'#4ECDC4'}}>{mins}m</div><div className="f-lbl">Cook Time</div></div>
+        </div>
+        <div className="photo-capture-card">
+          <div className="photo-capture-title">📸 Take a photo of your dish!</div>
+          {photo ? (<>
+            <img src={photo} className="photo-preview-img" alt="Your dish"/>
+            <button className="retake-lnk" onClick={()=>photoRef.current.click()}>📷 Retake photo</button>
+          </>) : (
+            <button className="photo-capture-btn" style={{borderColor:'#4ECDC4',color:'#1A8080'}} onClick={()=>photoRef.current.click()}>📷 Capture Your Creation</button>
+          )}
+          <input ref={photoRef} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={handlePhoto}/>
+        </div>
+        <button className="done-btn" style={{background:'#4ECDC4',color:'#fff'}} onClick={()=>onFinish(photo)}>
+          {photo?'✓ Save & Done 🏠':'Done 🏠'}
+        </button>
+      </div>
+    );
+  }
+
+  if(phase==='timer') return <CookingTimer seconds={curStep.timerSeconds} stepLabel={curStep.instruction.length>70?curStep.instruction.slice(0,70)+'…':curStep.instruction} onDone={()=>setPhase('step')}/>;
+
+  return (
+    <div className="ex-screen">
+      <div className="ex-header">
+        <button className="back-btn" onClick={onBack}>←</button>
+        <div className="ex-wname">{recipe.emoji} {recipe.label}</div>
+        <div className="ex-prog-text">{stepIdx+1} / {steps.length}</div>
+      </div>
+      <div className="prog-track"><div className="prog-fill" style={{width:`${pct}%`,background:'#4ECDC4'}}/></div>
+      <div className="ex-body">
+        <div className="set-badge" style={{background:'#4ECDC4',color:'#fff'}}>Step {stepIdx+1} of {steps.length}</div>
+        <div className="cook-step-instr">{curStep.instruction}</div>
+        {curStep.stepIngredients&&curStep.stepIngredients.length>0&&(
+          <div className="cook-ing-card">
+            <div className="cook-ing-title">You'll Need</div>
+            {curStep.stepIngredients.map((ing,i)=>(
+              <div key={i} className="cook-ing-row">
+                <div className="cook-ing-dot" style={{background:'#4ECDC4'}}/>
+                <div className="cook-ing-text">{ing}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        {curStep.timerSeconds&&(
+          <button className="timer-start-btn" style={{background:'rgba(78,205,196,0.15)',color:'#1A8080'}} onClick={()=>setPhase('timer')}>
+            ⏱ Start Timer ({fmt(curStep.timerSeconds)})
+          </button>
+        )}
+        <button className="log-btn" style={{background:'#4ECDC4',color:'#fff'}} onClick={handleNext}>
+          {isLast?'🍴 Finish Cooking!':'Next Step →'}
+        </button>
+      </div>
+      {nextStep&&(
+        <div className="ex-footer">
+          <div className="upcoming-title">Up Next</div>
+          <div className="upcoming-row">
+            <div className="up-dot" style={{background:'#4ECDC4'}}/>
+            <div className="up-name" style={{fontSize:12,lineHeight:1.4}}>
+              {nextStep.instruction.length>70?nextStep.instruction.slice(0,70)+'…':nextStep.instruction}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── WORKOUT FLOW ─────────────────────────────────────────────────────────────
 function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdateWeight,customWorkouts}) {
   const col=COLORS[categoryId];
@@ -735,6 +906,68 @@ function WorkoutBuilder({onSave,onClose}) {
         ))}
         <button className="add-step-btn" onClick={addStep}>+ Add Exercise</button>
         <div className="modal-actions"><button className="modal-cancel" onClick={onClose}>Cancel</button><button className="modal-save" onClick={save}>Save Workout</button></div>
+      </div>
+    </div>
+  );
+}
+
+// ─── RECIPE BUILDER ───────────────────────────────────────────────────────────
+const RECIPE_EMOJIS=['🍳','🥘','🫕','🍲','🥗','🍜','🍝','🥙','🌮','🍛','🎂','🥞','🍤','🫔','🥩'];
+function RecipeBuilder({onSave,onClose}) {
+  const [name,setName]=useState('');
+  const [emoji,setEmoji]=useState('🍳');
+  const [ingredients,setIngredients]=useState(['']);
+  const [steps,setSteps]=useState([{id:uid(),instruction:'',timerMinutes:''}]);
+  const addIng=()=>setIngredients(a=>[...a,'']);
+  const removeIng=idx=>setIngredients(a=>a.filter((_,j)=>j!==idx));
+  const updIng=(idx,v)=>setIngredients(a=>a.map((x,j)=>j===idx?v:x));
+  const addStep=()=>setSteps(s=>[...s,{id:uid(),instruction:'',timerMinutes:''}]);
+  const removeStep=id=>setSteps(s=>s.filter(x=>x.id!==id));
+  const updStep=(id,f,v)=>setSteps(s=>s.map(x=>x.id===id?{...x,[f]:v}:x));
+  const save=()=>{
+    if(!name.trim())return alert('Enter a recipe name.');
+    const validIngs=ingredients.filter(i=>i.trim());
+    if(!validIngs.length)return alert('Add at least one ingredient.');
+    const validSteps=steps.filter(s=>s.instruction.trim());
+    if(!validSteps.length)return alert('Add at least one step.');
+    onSave({id:uid(),label:name.trim(),emoji,custom:true,ingredients:validIngs,steps:validSteps.map((s,idx)=>({id:idx+1,instruction:s.instruction.trim(),stepIngredients:[],timerSeconds:s.timerMinutes?parseInt(s.timerMinutes)*60:null}))});
+  };
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+        <div className="modal-handle"/>
+        <div className="modal-title">Add a Recipe 📝</div>
+        <div className="form-group">
+          <div className="form-label">Emoji</div>
+          <div className="emoji-row">{RECIPE_EMOJIS.map(e=><div key={e} className={`emoji-opt ${emoji===e?'selected':''}`} onClick={()=>setEmoji(e)}>{e}</div>)}</div>
+        </div>
+        <div className="form-group"><label className="form-label">Recipe Name</label><input className="form-input" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Avocado Toast"/></div>
+        <div className="divider"/>
+        <div className="form-label" style={{marginBottom:12}}>Ingredients</div>
+        {ingredients.map((ing,idx)=>(
+          <div key={idx} style={{display:'flex',gap:8,marginBottom:8}}>
+            <input className="b-input" value={ing} onChange={e=>updIng(idx,e.target.value)} placeholder="e.g. 2 cups flour" style={{flex:1}}/>
+            {ingredients.length>1&&<button onClick={()=>removeIng(idx)} style={{background:'none',border:'none',fontSize:18,cursor:'pointer',color:'var(--muted)',padding:'0 4px',lineHeight:1}}>✕</button>}
+          </div>
+        ))}
+        <button className="add-step-btn" onClick={addIng}>+ Add Ingredient</button>
+        <div className="divider"/>
+        <div className="form-label" style={{marginBottom:12}}>Steps</div>
+        {steps.map((step,i)=>(
+          <div key={step.id} className="builder-step">
+            <div className="builder-hdr">
+              <div className="step-num">{i+1}</div>
+              <div style={{flex:1,fontSize:12,fontWeight:700,color:'var(--muted)'}}>Step {i+1}</div>
+              {steps.length>1&&<button className="remove-btn" onClick={()=>removeStep(step.id)}>✕</button>}
+            </div>
+            <div className="b-label">Instructions</div>
+            <textarea className="b-input" value={step.instruction} onChange={e=>updStep(step.id,'instruction',e.target.value)} placeholder="Describe this cooking step…" rows={3} style={{resize:'none',width:'100%',marginBottom:10,lineHeight:1.5}}/>
+            <div className="b-label">Timer — optional (minutes)</div>
+            <input className="b-input" value={step.timerMinutes} onChange={e=>updStep(step.id,'timerMinutes',e.target.value)} type="number" placeholder="e.g. 30" style={{maxWidth:90}}/>
+          </div>
+        ))}
+        <button className="add-step-btn" onClick={addStep}>+ Add Step</button>
+        <div className="modal-actions"><button className="modal-cancel" onClick={onClose}>Cancel</button><button className="modal-save" onClick={save}>Save Recipe</button></div>
       </div>
     </div>
   );
@@ -996,6 +1229,61 @@ function CalendarView({history,customWorkouts}) {
   </>);
 }
 
+// ─── KITCHEN VIEW ─────────────────────────────────────────────────────────────
+function KitchenView({onStartCooking,customRecipes,onBuildRecipe,recipePhotos}) {
+  const allRecipes=[...RECIPES,...(customRecipes||[])];
+  return (<>
+    <div style={{marginBottom:20}}>
+      <div style={{fontSize:32,fontWeight:900,letterSpacing:'-1.5px',marginBottom:4}}>Kitchen 🍳</div>
+      <div style={{fontSize:14,fontWeight:500,color:'var(--muted)'}}>Your recipes, one step at a time.</div>
+    </div>
+    <div style={{fontSize:16,fontWeight:900,letterSpacing:'-0.5px',marginBottom:14}}>Recipes</div>
+    <div style={{display:'flex',flexDirection:'column',gap:16}}>
+      {allRecipes.map(recipe=>{
+        const photos=recipePhotos[recipe.id]||[];
+        return (
+          <div key={recipe.id} style={{background:'#4ECDC4',borderRadius:26,padding:22}}>
+            {photos.length>0&&(
+              <img src={photos[photos.length-1]} alt="Dish" style={{width:'100%',borderRadius:16,objectFit:'cover',height:180,display:'block',marginBottom:14}}/>
+            )}
+            <div className="wc-top">
+              <div className="wc-name" style={{color:'#fff'}}>{recipe.label}{recipe.custom&&<span className="custom-tag">Custom</span>}</div>
+              <div className="wc-emoji">{recipe.emoji}</div>
+            </div>
+            <div className="wc-meta" style={{color:'rgba(255,255,255,0.8)',marginBottom:16}}>{recipe.ingredients.length} ingredients · {recipe.steps.length} steps</div>
+
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:1,color:'rgba(255,255,255,0.6)',marginBottom:10}}>Ingredients</div>
+              {recipe.ingredients.map((ing,i)=>(
+                <div key={i} className="recipe-ing-item">
+                  <div className="recipe-ing-num" style={{color:'rgba(255,255,255,0.55)'}}>{i+1}</div>
+                  <div className="recipe-ing-text" style={{color:'rgba(255,255,255,0.92)'}}>{ing}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{marginBottom:18}}>
+              <div style={{fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:1,color:'rgba(255,255,255,0.6)',marginBottom:10}}>Steps</div>
+              {recipe.steps.map((step,i)=>(
+                <div key={i} style={{display:'flex',gap:10,marginBottom:10,alignItems:'flex-start'}}>
+                  <div style={{width:22,height:22,borderRadius:'50%',background:'rgba(255,255,255,0.25)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,color:'#fff',flexShrink:0,marginTop:1}}>{i+1}</div>
+                  <div style={{fontSize:13,fontWeight:600,color:'rgba(255,255,255,0.92)',lineHeight:1.4,flex:1}}>
+                    {step.instruction}
+                    {step.timerSeconds&&<span style={{marginLeft:6,fontSize:11,fontWeight:700,background:'rgba(255,255,255,0.2)',borderRadius:50,padding:'2px 8px',whiteSpace:'nowrap',display:'inline-block',marginTop:4}}>⏱ {fmt(step.timerSeconds)}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button className="start-btn" onClick={()=>onStartCooking(recipe.id)}>Start Cooking →</button>
+          </div>
+        );
+      })}
+    </div>
+    <button className="build-btn" style={{marginTop:16}} onClick={onBuildRecipe}>📝 Add a Recipe</button>
+  </>);
+}
+
 // ─── EDIT PROFILE ─────────────────────────────────────────────────────────────
 function EditProfileModal({profile,onSave,onClose}) {
   const [name,setName]=useState(profile.name||'');
@@ -1133,7 +1421,10 @@ function App() {
   const [data,setData]=useState({history:[],weightHistory:{},profile:null,customWorkouts:[]});
   const [showEdit,setShowEdit]=useState(false);
   const [showBuilder,setShowBuilder]=useState(false);
+  const [showRecipeBuilder,setShowRecipeBuilder]=useState(false);
   const [favorites,setFavorites]=useState(()=>{try{return JSON.parse(localStorage.getItem('cc-favorites')||'[]');}catch{return [];}});
+  const [customRecipes,setCustomRecipes]=useState(()=>{try{return JSON.parse(localStorage.getItem('cc-recipes')||'[]');}catch{return [];}});
+  const [recipePhotos,setRecipePhotos]=useState(()=>{try{return JSON.parse(localStorage.getItem('cc-recipe-photos')||'{}');}catch{return {};}});
   const toggleFavorite=(workoutId,categoryId)=>{setFavorites(prev=>{const exists=prev.find(f=>f.id===workoutId);const next=exists?prev.filter(f=>f.id!==workoutId):[...prev,{id:workoutId,categoryId}];localStorage.setItem('cc-favorites',JSON.stringify(next));return next;});};
 
   useEffect(()=>{
@@ -1184,6 +1475,13 @@ function App() {
   const saveProfile=async u=>{setData(d=>({...d,profile:u}));setShowEdit(false);await sb.from('profile').upsert({user_id:session.user.id,...u});};
   const saveWorkout=async w=>{setData(d=>({...d,customWorkouts:[...(d.customWorkouts||[]),w]}));setShowBuilder(false);setNav({type:'category',categoryId:w.categoryId});await sb.from('custom_workouts').insert({id:w.id,user_id:session.user.id,label:w.label,emoji:w.emoji,category_id:w.categoryId,steps:w.steps});};
   const deleteWorkout=async id=>{setData(d=>({...d,customWorkouts:(d.customWorkouts||[]).filter(w=>w.id!==id)}));await sb.from('custom_workouts').delete().eq('id',id).eq('user_id',session.user.id);};
+  const saveRecipe=r=>{const updated=[...customRecipes,r];setCustomRecipes(updated);localStorage.setItem('cc-recipes',JSON.stringify(updated));setShowRecipeBuilder(false);};
+  const finishCooking=photo=>{
+    if(photo&&nav?.recipeId){
+      setRecipePhotos(prev=>{const photos=[...(prev[nav.recipeId]||[]),photo];const updated={...prev,[nav.recipeId]:photos};localStorage.setItem('cc-recipe-photos',JSON.stringify(updated));return updated;});
+    }
+    setNav(null);setTab('kitchen');
+  };
 
   const streak=(()=>{let s=0;const t=new Date();for(let i=0;i<60;i++){const d=new Date(t);d.setDate(t.getDate()-i);if(history.find(w=>w.date===d.toISOString().split('T')[0]))s++;else if(i>0)break;}return s;})();
   const weekCount=history.filter(w=>new Date()-new Date(w.date)<7*86400000).length;
@@ -1197,10 +1495,12 @@ function App() {
   if(!session) return <AuthScreen/>;
   if(dataLoading) return <div className="loading-screen"><div className="loading-wordmark">Coach <span>Court</span></div><div className="spinner"/><div style={{fontSize:13,fontWeight:600,color:'var(--muted)'}}>Loading…</div></div>;
   if(nav?.type==='workout') return <WorkoutFlow categoryId={nav.categoryId} workoutId={nav.workoutId} onFinish={finishWorkout} onBack={()=>setNav({type:'category',categoryId:nav.categoryId})} weightHistory={wh} onUpdateWeight={updateWeight} customWorkouts={custom}/>;
+  if(nav?.type==='cooking') return <CookingFlow recipeId={nav.recipeId} onFinish={finishCooking} onBack={()=>{setNav(null);setTab('kitchen');}} customRecipes={customRecipes}/>;
 
   return (<>
     {showEdit&&<EditProfileModal profile={profile} onSave={saveProfile} onClose={()=>setShowEdit(false)}/>}
     {showBuilder&&<WorkoutBuilder onSave={saveWorkout} onClose={()=>setShowBuilder(false)}/>}
+    {showRecipeBuilder&&<RecipeBuilder onSave={saveRecipe} onClose={()=>setShowRecipeBuilder(false)}/>}
 
     <div className="topbar">
       <div className="topbar-left">
@@ -1272,13 +1572,14 @@ function App() {
       </>)}
 
       {!nav&&tab==='calendar'&&<CalendarView history={history} customWorkouts={custom}/>}
+      {!nav&&tab==='kitchen'&&<KitchenView onStartCooking={id=>setNav({type:'cooking',recipeId:id})} customRecipes={customRecipes} onBuildRecipe={()=>setShowRecipeBuilder(true)} recipePhotos={recipePhotos}/>}
       {!nav&&tab==='profile'&&<ProfileView history={history} profile={profile} userEmail={userEmail} onEdit={()=>setShowEdit(true)} onSignOut={signOut}/>}
     </div>
 
     {!nav&&(
       <div className="nav-wrap">
         <div className="nav-inner">
-          {[{key:'home',icon:'🏠',label:'Home'},{key:'calendar',icon:'📅',label:'Log'},{key:'profile',icon:'📊',label:'Account'}].map(({key,icon,label})=>(
+          {[{key:'home',icon:'🏠',label:'Home'},{key:'calendar',icon:'📅',label:'Log'},{key:'kitchen',icon:'🍳',label:'Kitchen'},{key:'profile',icon:'📊',label:'Account'}].map(({key,icon,label})=>(
             <button key={key} className={`nav-btn ${tab===key?'active':''}`} onClick={()=>{setTab(key);setNav(null);}}>
               <div className="nav-icon">{icon}</div>
               <div className="nav-label">{label}</div>
