@@ -88,10 +88,10 @@
 
     /* CATEGORY CARDS */
     .category-list { display:flex; flex-direction:column; gap:12px; }
-    .category-card { border-radius:26px; padding:22px 22px 20px; cursor:pointer; transition:transform 0.15s; }
+    .category-card { border-radius:26px; padding:14px 20px 13px; cursor:pointer; transition:transform 0.15s; }
     .category-card:active { transform:scale(0.97); }
-    .cat-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px; }
-    .cat-name { font-size:34px; font-weight:900; letter-spacing:-1.5px; line-height:1; }
+    .cat-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:9px; }
+    .cat-name { font-size:30px; font-weight:900; letter-spacing:-1.5px; line-height:1; }
     .cat-arrow-circle { width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
     .cat-pills { display:flex; gap:8px; flex-wrap:wrap; }
     .cat-pill { border-radius:50px; padding:7px 14px; font-size:13px; font-weight:700; background:rgba(0,0,0,0.1); }
@@ -171,6 +171,7 @@
     .start-btn { width:100%; border:none; border-radius:50px; padding:15px; font-family:'Inter',sans-serif; font-size:15px; font-weight:800; cursor:pointer; background:rgba(0,0,0,0.75); color:#fff; transition:transform 0.15s; }
     .start-btn:active { transform:scale(0.97); }
     .delete-btn { background:rgba(0,0,0,0.08); border:none; border-radius:8px; padding:5px 10px; font-size:11px; font-weight:700; color:rgba(0,0,0,0.4); cursor:pointer; font-family:'Inter',sans-serif; margin-top:4px; }
+    .fav-star { background:none; border:none; font-size:22px; cursor:pointer; padding:0 2px; line-height:1; transition:transform 0.15s; }
     .empty-state { text-align:center; padding:52px 24px; }
     .empty-emoji { font-size:56px; margin-bottom:14px; }
     .empty-text { font-size:18px; font-weight:900; letter-spacing:-0.5px; }
@@ -701,7 +702,7 @@ function WorkoutBuilder({onSave,onClose}) {
       <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
         <div className="modal-handle"/>
         <div className="modal-title">Build a Workout ✨</div>
-        <div className="form-group"><div className="form-label">Emoji</div><div className="emoji-row">{EMOJIS.map(e=><div key={e} className={`emoji-opt ${emoji===e?'selected':''}`} onClick={()=>setEmoji(e)}>{e}</div>)}</div></div>
+        <div className="form-group"><div className="form-label">Emoji</div><div className="emoji-row">{EMOJIS.map(e=><div key={e} className={`emoji-opt ${emoji===e?'selected':''}`} onClick={()=>setEmoji(e)}>{e}</div>)}</div><div style={{display:'flex',alignItems:'center',gap:8,marginTop:6}}><span style={{fontSize:11,fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.5px',whiteSpace:'nowrap'}}>Custom:</span><input style={{width:52,height:42,border:'1.5px solid var(--border)',borderRadius:12,fontSize:22,textAlign:'center',fontFamily:'Inter,sans-serif',background:'var(--bg2)',outline:'none',cursor:'text'}} placeholder="😀" onChange={e=>{const v=[...e.target.value.trim()];if(v.length)setEmoji(v.slice(0,2).join(''));}} onFocus={e=>e.target.select()}/><span style={{fontSize:12,fontWeight:500,color:'var(--muted)'}}>type any emoji from your keyboard</span></div></div>
         <div className="form-group"><label className="form-label">Name</label><input className="form-input" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Glute Blast Sunday"/></div>
         <div className="form-group"><label className="form-label">Category</label><select className="form-select" value={catId} onChange={e=>setCatId(e.target.value)}>{Object.entries(CATEGORIES).map(([k,v])=><option key={k} value={k}>{v.emoji} {v.label}</option>)}</select></div>
         <div className="divider"/>
@@ -878,8 +879,35 @@ function matchesFilters(workout, filters) {
   return true;
 }
 
+// ─── FAVORITES DETAIL ─────────────────────────────────────────────────────────
+function FavoritesDetail({onBack,onStart,customWorkouts,favorites,onToggleFavorite}) {
+  const favWorkouts=(favorites||[]).map(f=>{const w=getWorkout(f.categoryId,f.id,customWorkouts);if(!w)return null;return{...w,categoryId:f.categoryId};}).filter(Boolean);
+  return (<>
+    <div className="page-header">
+      <button className="back-btn" onClick={onBack}>←</button>
+      <div><div className="page-title">⭐ Favorites</div><div className="page-subtitle">{favWorkouts.length} saved workout{favWorkouts.length!==1?'s':''}</div></div>
+    </div>
+    {favWorkouts.length===0&&<div className="empty-state"><div className="empty-emoji">⭐</div><div className="empty-text">No favorites yet</div><div className="empty-sub">Tap ☆ on any workout to save it here</div></div>}
+    <div className="workout-cards">{favWorkouts.map(w=>{const col=COLORS[w.categoryId];return(
+      <div key={w.id} className="workout-card" style={{background:col.bg}}>
+        <div className="wc-top">
+          <div className="wc-name" style={{color:col.text}}>{w.label}{w.custom&&<span className="custom-tag">Custom</span>}</div>
+          <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4}}>
+            <button className="fav-star" style={{color:col.text==='#FFFFFF'?'#FFD700':'#B8860B'}} onClick={()=>onToggleFavorite(w.id,w.categoryId)}>★</button>
+            <div className="wc-emoji">{w.emoji}</div>
+          </div>
+        </div>
+        <div className="wc-meta" style={{color:col.text}}>{w.steps.length} exercises · {w.steps.reduce((a,s)=>a+s.sets,0)} sets</div>
+        <div className="ex-list">{w.steps.map((s,i)=><div key={i} className="ex-row"><div className="ex-num" style={{color:col.text}}>{i+1}</div><div className="ex-name" style={{color:col.text}}>{sLabel(s)}{s.type==='superset'&&<span className="ss-tag">SS</span>}</div><div className="ex-meta" style={{color:col.text}}>{s.sets}×{Array.isArray(s.reps)?s.reps[0]:s.reps}</div></div>)}</div>
+        <button className="start-btn" style={{background:'rgba(0,0,0,0.75)',color:'#fff'}} onClick={()=>onStart(w.categoryId,w.id)}>Start Workout →</button>
+      </div>
+    );})}
+    </div>
+  </>);
+}
+
 // ─── CATEGORY DETAIL ──────────────────────────────────────────────────────────
-function CategoryDetail({categoryId,onBack,onStart,customWorkouts,onDelete,onBuild}) {
+function CategoryDetail({categoryId,onBack,onStart,customWorkouts,onDelete,onBuild,favorites,onToggleFavorite}) {
   const cat=CATEGORIES[categoryId];
   const col=COLORS[categoryId];
   const all=[...cat.workouts,...(customWorkouts||[]).filter(w=>w.categoryId===categoryId)];
@@ -928,11 +956,12 @@ function CategoryDetail({categoryId,onBack,onStart,customWorkouts,onDelete,onBui
       </div>
     )}
 
-    <div className="workout-cards">{filtered.map(w=>(
+    <div className="workout-cards">{filtered.map(w=>{const isFav=(favorites||[]).some(f=>f.id===w.id);return(
       <div key={w.id} className="workout-card" style={{background:col.bg}}>
         <div className="wc-top">
           <div className="wc-name" style={{color:col.text}}>{w.label}{w.custom&&<span className="custom-tag">Custom</span>}</div>
           <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4}}>
+            <button className="fav-star" style={{color:isFav?(col.text==='#FFFFFF'?'#FFD700':'#B8860B'):col.text,opacity:isFav?1:0.3}} onClick={e=>{e.stopPropagation();onToggleFavorite&&onToggleFavorite(w.id,categoryId);}}>{isFav?'★':'☆'}</button>
             <div className="wc-emoji">{w.emoji}</div>
             {w.custom&&<button className="delete-btn" onClick={()=>onDelete(w.id)}>Delete</button>}
           </div>
@@ -941,7 +970,7 @@ function CategoryDetail({categoryId,onBack,onStart,customWorkouts,onDelete,onBui
         <div className="ex-list">{w.steps.map((s,i)=><div key={i} className="ex-row"><div className="ex-num" style={{color:col.text}}>{i+1}</div><div className="ex-name" style={{color:col.text}}>{sLabel(s)}{s.type==='superset'&&<span className="ss-tag">SS</span>}</div><div className="ex-meta" style={{color:col.text}}>{s.sets}×{Array.isArray(s.reps)?s.reps[0]:s.reps}</div></div>)}</div>
         <button className="start-btn" style={{background:'rgba(0,0,0,0.75)',color:'#fff'}} onClick={()=>onStart(categoryId,w.id)}>Start Workout →</button>
       </div>
-    ))}</div>
+    );})}}</div>
     <button className="build-btn" style={{marginTop:16}} onClick={onBuild}>✨ Build a Workout</button>
   </>);
 }
@@ -1025,7 +1054,7 @@ function ProfileView({history,profile,userEmail,onEdit,onSignOut}) {
   };
 
   return (<>
-    <div ref={shareRef} style={{background:'#fff',padding:'4px 0'}}>
+    <div ref={shareRef} style={{background:'#fff',padding:'16px'}}>
       <div className="profile-hero" style={{background:COLORS.upper.bg}}>
         <div className="avatar" onClick={onEdit}>{profile?.photo?<img src={profile.photo} alt=""/>:initials}</div>
         <div style={{flex:1,minWidth:0}}>
@@ -1085,6 +1114,8 @@ function App() {
   const [data,setData]=useState({history:[],weightHistory:{},profile:null,customWorkouts:[]});
   const [showEdit,setShowEdit]=useState(false);
   const [showBuilder,setShowBuilder]=useState(false);
+  const [favorites,setFavorites]=useState(()=>{try{return JSON.parse(localStorage.getItem('cc-favorites')||'[]');}catch{return [];}});
+  const toggleFavorite=(workoutId,categoryId)=>{setFavorites(prev=>{const exists=prev.find(f=>f.id===workoutId);const next=exists?prev.filter(f=>f.id!==workoutId):[...prev,{id:workoutId,categoryId}];localStorage.setItem('cc-favorites',JSON.stringify(next));return next;});};
 
   useEffect(()=>{
     sb.auth.getSession().then(({data:{session}})=>setSession(session));
@@ -1165,7 +1196,8 @@ function App() {
     {error&&<div className="error-bar">⚠️ {error}</div>}
 
     <div className="scroll">
-      {nav?.type==='category'&&<CategoryDetail categoryId={nav.categoryId} onBack={()=>setNav(null)} onStart={(c,w)=>setNav({type:'workout',categoryId:c,workoutId:w})} customWorkouts={custom} onDelete={deleteWorkout} onBuild={()=>setShowBuilder(true)}/>}
+      {nav?.type==='category'&&<CategoryDetail categoryId={nav.categoryId} onBack={()=>setNav(null)} onStart={(c,w)=>setNav({type:'workout',categoryId:c,workoutId:w})} customWorkouts={custom} onDelete={deleteWorkout} onBuild={()=>setShowBuilder(true)} favorites={favorites} onToggleFavorite={toggleFavorite}/>}
+      {nav?.type==='favorites'&&<FavoritesDetail onBack={()=>setNav(null)} onStart={(c,w)=>setNav({type:'workout',categoryId:c,workoutId:w})} customWorkouts={custom} favorites={favorites} onToggleFavorite={toggleFavorite}/>}
 
       {!nav&&tab==='home'&&(<>
         <div style={{marginTop:14,marginBottom:18}}>
@@ -1180,6 +1212,20 @@ function App() {
         </div>
         <div className="section-title">Workouts</div>
         <div className="category-list">
+          {favorites.length>0&&(
+            <div className="category-card" style={{background:'#FFD700'}} onClick={()=>setNav({type:'favorites'})}>
+              <div className="cat-top">
+                <div className="cat-name" style={{color:'#5A4200'}}>Favorites</div>
+                <div className="cat-arrow-circle" style={{background:'rgba(0,0,0,0.12)'}}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5A4200" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                </div>
+              </div>
+              <div className="cat-pills">
+                <div className="cat-pill" style={{color:'#5A4200'}}>⭐ Saved</div>
+                <div className="cat-pill" style={{color:'#5A4200'}}>{favorites.length} workout{favorites.length!==1?'s':''}</div>
+              </div>
+            </div>
+          )}
           {Object.entries(CATEGORIES).map(([key,cat])=>{
             const col=COLORS[key];const cc=custom.filter(w=>w.categoryId===key).length;const tot=cat.workouts.length+cc;
             const accentBg=col.text==='#FFFFFF'?'rgba(255,255,255,0.22)':'rgba(0,0,0,0.12)';
