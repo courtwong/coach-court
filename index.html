@@ -88,11 +88,11 @@
 
     /* CATEGORY CARDS */
     .category-list { display:flex; flex-direction:column; gap:12px; }
-    .category-card { border-radius:26px; padding:22px 22px 20px; cursor:pointer; transition:transform 0.15s; }
+    .category-card { border-radius:26px; padding:14px 18px 12px; cursor:pointer; transition:transform 0.15s; }
     .category-card:active { transform:scale(0.97); }
-    .cat-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px; }
-    .cat-name { font-size:34px; font-weight:900; letter-spacing:-1.5px; line-height:1; }
-    .cat-arrow-circle { width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .cat-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+    .cat-name { font-size:26px; font-weight:900; letter-spacing:-1px; line-height:1; }
+    .cat-arrow-circle { width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
     .cat-pills { display:flex; gap:8px; flex-wrap:wrap; }
     .cat-pill { border-radius:50px; padding:7px 14px; font-size:13px; font-weight:700; background:rgba(0,0,0,0.1); }
 
@@ -684,6 +684,7 @@ const EMOJIS=['🏋️','💪','🦵','🍑','👑','🔥','⚡','🌟','🏃','
 function WorkoutBuilder({onSave,onClose}) {
   const [name,setName]=useState('');
   const [emoji,setEmoji]=useState('🏋️');
+  const [customEmoji,setCustomEmoji]=useState('');
   const [catId,setCatId]=useState('lower');
   const [steps,setSteps]=useState([{id:uid(),type:'single',name:'',sets:'3',reps:'',name2:'',reps2:''}]);
   const addStep=()=>setSteps(s=>[...s,{id:uid(),type:'single',name:'',sets:'3',reps:'',name2:'',reps2:''}]);
@@ -701,7 +702,15 @@ function WorkoutBuilder({onSave,onClose}) {
       <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
         <div className="modal-handle"/>
         <div className="modal-title">Build a Workout ✨</div>
-        <div className="form-group"><div className="form-label">Emoji</div><div className="emoji-row">{EMOJIS.map(e=><div key={e} className={`emoji-opt ${emoji===e?'selected':''}`} onClick={()=>setEmoji(e)}>{e}</div>)}</div></div>
+        <div className="form-group">
+          <div className="form-label">Emoji</div>
+          <div className="emoji-row">{EMOJIS.map(e=><div key={e} className={`emoji-opt ${emoji===e&&!customEmoji?'selected':''}`} onClick={()=>{setEmoji(e);setCustomEmoji('');}}>{e}</div>)}</div>
+          <div style={{display:'flex',alignItems:'center',gap:10,marginTop:10}}>
+            <span style={{fontSize:11,fontWeight:700,color:'var(--muted)',whiteSpace:'nowrap'}}>Or pick your own:</span>
+            <input className="b-input" style={{width:60,textAlign:'center',fontSize:24,padding:'6px 4px',lineHeight:1}} value={customEmoji} onChange={ev=>{const val=ev.target.value;setCustomEmoji(val);const chars=Array.from(val.trim());if(chars.length>0)setEmoji(chars[chars.length-1]);}} placeholder="✏️" maxLength={8}/>
+            {customEmoji&&<span style={{fontSize:20}}>{emoji}</span>}
+          </div>
+        </div>
         <div className="form-group"><label className="form-label">Name</label><input className="form-input" value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Glute Blast Sunday"/></div>
         <div className="form-group"><label className="form-label">Category</label><select className="form-select" value={catId} onChange={e=>setCatId(e.target.value)}>{Object.entries(CATEGORIES).map(([k,v])=><option key={k} value={k}>{v.emoji} {v.label}</option>)}</select></div>
         <div className="divider"/>
@@ -879,7 +888,7 @@ function matchesFilters(workout, filters) {
 }
 
 // ─── CATEGORY DETAIL ──────────────────────────────────────────────────────────
-function CategoryDetail({categoryId,onBack,onStart,customWorkouts,onDelete,onBuild}) {
+function CategoryDetail({categoryId,onBack,onStart,customWorkouts,onDelete,onBuild,favorites,onToggleFavorite,isFav}) {
   const cat=CATEGORIES[categoryId];
   const col=COLORS[categoryId];
   const all=[...cat.workouts,...(customWorkouts||[]).filter(w=>w.categoryId===categoryId)];
@@ -933,7 +942,10 @@ function CategoryDetail({categoryId,onBack,onStart,customWorkouts,onDelete,onBui
         <div className="wc-top">
           <div className="wc-name" style={{color:col.text}}>{w.label}{w.custom&&<span className="custom-tag">Custom</span>}</div>
           <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:4}}>
-            <div className="wc-emoji">{w.emoji}</div>
+            <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <button onClick={(e)=>{e.stopPropagation();onToggleFavorite(categoryId,w.id);}} style={{background:'rgba(0,0,0,0.1)',border:'none',borderRadius:50,width:34,height:34,fontSize:16,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{isFav(categoryId,w.id)?'❤️':'🤍'}</button>
+              <div className="wc-emoji">{w.emoji}</div>
+            </div>
             {w.custom&&<button className="delete-btn" onClick={()=>onDelete(w.id)}>Delete</button>}
           </div>
         </div>
@@ -1025,7 +1037,7 @@ function ProfileView({history,profile,userEmail,onEdit,onSignOut}) {
   };
 
   return (<>
-    <div ref={shareRef} style={{background:'#fff',padding:'4px 0'}}>
+    <div ref={shareRef} style={{background:'#fff',padding:'20px 18px 14px'}}>
       <div className="profile-hero" style={{background:COLORS.upper.bg}}>
         <div className="avatar" onClick={onEdit}>{profile?.photo?<img src={profile.photo} alt=""/>:initials}</div>
         <div style={{flex:1,minWidth:0}}>
@@ -1085,6 +1097,9 @@ function App() {
   const [data,setData]=useState({history:[],weightHistory:{},profile:null,customWorkouts:[]});
   const [showEdit,setShowEdit]=useState(false);
   const [showBuilder,setShowBuilder]=useState(false);
+  const [favorites,setFavorites]=useState(()=>{try{return JSON.parse(localStorage.getItem('cc-fav')||'[]');}catch{return [];}});
+  const toggleFavorite=(catId,wId)=>{setFavorites(prev=>{const key=`${catId}:${wId}`;const next=prev.some(f=>f.c===catId&&f.w===wId)?prev.filter(f=>!(f.c===catId&&f.w===wId)):[...prev,{c:catId,w:wId}];localStorage.setItem('cc-fav',JSON.stringify(next));return next;});};
+  const isFav=(catId,wId)=>favorites.some(f=>f.c===catId&&f.w===wId);
 
   useEffect(()=>{
     sb.auth.getSession().then(({data:{session}})=>setSession(session));
@@ -1165,7 +1180,7 @@ function App() {
     {error&&<div className="error-bar">⚠️ {error}</div>}
 
     <div className="scroll">
-      {nav?.type==='category'&&<CategoryDetail categoryId={nav.categoryId} onBack={()=>setNav(null)} onStart={(c,w)=>setNav({type:'workout',categoryId:c,workoutId:w})} customWorkouts={custom} onDelete={deleteWorkout} onBuild={()=>setShowBuilder(true)}/>}
+      {nav?.type==='category'&&<CategoryDetail categoryId={nav.categoryId} onBack={()=>setNav(null)} onStart={(c,w)=>setNav({type:'workout',categoryId:c,workoutId:w})} customWorkouts={custom} onDelete={deleteWorkout} onBuild={()=>setShowBuilder(true)} favorites={favorites} onToggleFavorite={toggleFavorite} isFav={isFav}/>}
 
       {!nav&&tab==='home'&&(<>
         <div style={{marginTop:14,marginBottom:18}}>
@@ -1200,6 +1215,10 @@ function App() {
           })}
         </div>
         <button className="build-btn" style={{marginTop:12}} onClick={()=>setShowBuilder(true)}>✨ Build a Workout</button>
+        {favorites.length>0&&(<>
+          <div className="section-title">❤️ Favorites</div>
+          <div className="recent-list">{favorites.map(({c:catId,w:wId})=>{const workout=getWorkout(catId,wId,custom);if(!workout)return null;const col=COLORS[catId];return(<div key={`${catId}:${wId}`} className="recent-card" style={{background:col.bg}}><div className="recent-icon">{workout.emoji}</div><div style={{flex:1}}><div className="recent-name" style={{color:col.text}}>{workout.label}</div><div className="recent-meta" style={{color:col.text}}>{CATEGORIES[catId]?.label}</div></div><button onClick={()=>setNav({type:'workout',categoryId:catId,workoutId:wId})} style={{background:'rgba(0,0,0,0.15)',border:'none',borderRadius:50,padding:'8px 14px',fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:800,color:col.text,cursor:'pointer',flexShrink:0}}>Start →</button></div>);})}</div>
+        </>)}
         {history.length>0&&(<>
           <div className="section-title">Recent</div>
           <div className="recent-list">{history.slice(0,4).map((e,i)=>{const c=COLORS[e.categoryId];const wDef=getWorkout(e.categoryId,e.workoutId,custom);return <div key={i} className="recent-card" style={{background:c.bg}}><div className="recent-icon">{CATEGORIES[e.categoryId]?.emoji}</div><div style={{flex:1}}><div className="recent-name" style={{color:c.text}}>{wDef?.label||CATEGORIES[e.categoryId]?.label}</div><div className="recent-meta" style={{color:c.text}}>{new Date(e.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div></div><div className="recent-dur" style={{color:c.text}}>{e.duration}m</div></div>;})} </div>
