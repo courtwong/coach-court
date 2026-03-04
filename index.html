@@ -1037,8 +1037,27 @@ function ProfileView({history,profile,userEmail,onEdit,onSignOut}) {
     if(!shareRef.current||sharing)return;
     setSharing(true);
     try{
-      const canvas=await html2canvas(shareRef.current,{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false});
-      canvas.toBlob(async(blob)=>{
+      const SHARE_W=390,PADDING=20,SCALE=2;
+      const SHARE_H=Math.round(SHARE_W*16/9);
+      const CONTENT_W=SHARE_W-2*PADDING;
+      const wrapper=document.createElement('div');
+      Object.assign(wrapper.style,{position:'fixed',left:'-9999px',top:'0',width:CONTENT_W+'px',background:'#ffffff',fontFamily:"'Inter',sans-serif"});
+      const clone=shareRef.current.cloneNode(true);
+      wrapper.appendChild(clone);
+      document.body.appendChild(wrapper);
+      let srcCanvas;
+      try{srcCanvas=await html2canvas(wrapper,{scale:SCALE,useCORS:true,backgroundColor:'#ffffff',logging:false});}
+      finally{document.body.removeChild(wrapper);}
+      const out=document.createElement('canvas');
+      out.width=SHARE_W*SCALE;out.height=SHARE_H*SCALE;
+      const ctx=out.getContext('2d');
+      ctx.fillStyle='#ffffff';ctx.fillRect(0,0,out.width,out.height);
+      const iW=(SHARE_W-2*PADDING)*SCALE,iH=(SHARE_H-2*PADDING)*SCALE;
+      const sc=Math.min(iW/srcCanvas.width,iH/srcCanvas.height,1);
+      const dW=Math.round(srcCanvas.width*sc),dH=Math.round(srcCanvas.height*sc);
+      const dX=PADDING*SCALE+Math.round((iW-dW)/2),dY=PADDING*SCALE;
+      ctx.drawImage(srcCanvas,dX,dY,dW,dH);
+      out.toBlob(async(blob)=>{
         if(!blob){setSharing(false);return;}
         const file=new File([blob],'coach-court-stats.jpg',{type:'image/jpeg'});
         if(navigator.canShare&&navigator.canShare({files:[file]})){
@@ -1054,7 +1073,7 @@ function ProfileView({history,profile,userEmail,onEdit,onSignOut}) {
   };
 
   return (<>
-    <div ref={shareRef} style={{background:'#fff',padding:'16px'}}>
+    <div ref={shareRef} style={{background:'#fff'}}>
       <div className="profile-hero" style={{background:COLORS.upper.bg}}>
         <div className="avatar" onClick={onEdit}>{profile?.photo?<img src={profile.photo} alt=""/>:initials}</div>
         <div style={{flex:1,minWidth:0}}>
