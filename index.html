@@ -1310,18 +1310,18 @@ function CalendarView({history,customWorkouts,cookingLog,onDeleteEntry,onEditEnt
             </div>
           );
         } else {
-          const cat=MEAL_CATEGORIES[entry.mealType||'dinner'];const c=cat.color;const isLight=c.text!=='#FFFFFF';
+          const cat=MEAL_CATEGORIES[entry.mealType||'dinner'];
           return (
-            <div key={i} className="recent-card" style={{background:c.bg}}>
+            <div key={i} className="recent-card" style={{background:'#4ECDC4'}}>
               <div className="recent-icon">{entry.emoji}</div>
               <div style={{flex:1}}>
-                <div className="recent-name" style={{color:c.text}}>{entry.label}</div>
-                <div className="recent-meta" style={{color:c.text}}>{cat.emoji} {cat.label} · {new Date(entry.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div>
+                <div className="recent-name" style={{color:'#fff'}}>{entry.label}</div>
+                <div className="recent-meta" style={{color:'#fff'}}>{cat.emoji} {cat.label} · {new Date(entry.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div>
               </div>
               <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}>
-                <div className="recent-dur" style={{color:c.text}}>{entry.duration}m</div>
+                <div className="recent-dur" style={{color:'#fff'}}>{entry.duration}m</div>
                 <div style={{display:'flex',gap:5}}>
-                  <button className="log-action-btn" style={{background:isLight?'rgba(200,0,0,0.12)':'rgba(255,255,255,0.18)',color:isLight?'#CC0000':c.text}} onClick={ev=>{ev.stopPropagation();if(confirm('Delete this entry?'))onDeleteCookingEntry(entry.id);}}>Del</button>
+                  <button className="log-action-btn" style={{background:'rgba(255,255,255,0.22)',color:'#fff'}} onClick={ev=>{ev.stopPropagation();if(confirm('Delete this entry?'))onDeleteCookingEntry(entry.id);}}>Del</button>
                 </div>
               </div>
             </div>
