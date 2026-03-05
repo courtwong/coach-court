@@ -718,7 +718,7 @@ function CookingFlow({recipeId,onFinish,onBack,customRecipes}) {
           )}
           <input ref={photoRef} type="file" accept="image/*" capture="environment" style={{display:'none'}} onChange={handlePhoto}/>
         </div>
-        <button className="done-btn" style={{background:'#4ECDC4',color:'#fff'}} onClick={()=>onFinish(photo)}>
+        <button className="done-btn" style={{background:'#4ECDC4',color:'#fff'}} onClick={()=>onFinish(photo,mins)}>
           {photo?'✓ Save & Done 🏠':'Done 🏠'}
         </button>
       </div>
@@ -1255,45 +1255,78 @@ function EditWorkoutModal({entry,onSave,onClose,customWorkouts}) {
 }
 
 // ─── CALENDAR ─────────────────────────────────────────────────────────────────
-function CalendarView({history,customWorkouts,onDeleteEntry,onEditEntry}) {
+function CalendarView({history,customWorkouts,cookingLog,onDeleteEntry,onEditEntry,onDeleteCookingEntry}) {
   const today=new Date();const yr=today.getFullYear(),mo=today.getMonth();
   const firstDay=new Date(yr,mo,1).getDay();const days=new Date(yr,mo+1,0).getDate();
   const wmap={};history.forEach(w=>{wmap[w.date]=w;});
+  const cmap={};(cookingLog||[]).forEach(c=>{if(!cmap[c.date])cmap[c.date]=c;});
   const [editEntry,setEditEntry]=useState(null);
+  const allEntries=[...history.map(e=>({...e,_type:'workout'})),...(cookingLog||[]).map(e=>({...e,_type:'cooking'}))].sort((a,b)=>b.date.localeCompare(a.date)||0);
   return (<>
     {editEntry&&<EditWorkoutModal entry={editEntry} onSave={(id,mins)=>{onEditEntry(id,mins);setEditEntry(null);}} onClose={()=>setEditEntry(null)} customWorkouts={customWorkouts}/>}
     <div style={{marginBottom:24}}>
       <div style={{fontSize:32,fontWeight:900,letterSpacing:'-1.5px',marginBottom:4}}>{today.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>
-      <div style={{fontSize:14,fontWeight:500,color:'var(--muted)'}}>{history.length} workouts all-time</div>
+      <div style={{fontSize:14,fontWeight:500,color:'var(--muted)'}}>{history.length} workout{history.length!==1?'s':''} · {(cookingLog||[]).length} recipe{(cookingLog||[]).length!==1?'s':''} cooked</div>
     </div>
     <div className="cal-grid">
       {['S','M','T','W','T','F','S'].map((d,i)=><div key={i} className="cal-hdr">{d}</div>)}
       {Array.from({length:firstDay}).map((_,i)=><div key={'e'+i} className="cal-day empty"/>)}
-      {Array.from({length:days}).map((_,i)=>{const d=i+1;const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;const entry=wmap[ds];const c=entry?COLORS[entry.categoryId]:null;const isToday=d===today.getDate();return <div key={d} className={`cal-day ${entry?'worked':''} ${isToday?'today':''}`} style={entry?{background:c?.bg,color:c?.text}:{}}>{d}</div>;})}
+      {Array.from({length:days}).map((_,i)=>{
+        const d=i+1;
+        const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const wEntry=wmap[ds];const cEntry=cmap[ds];
+        const isToday=d===today.getDate();
+        let bg,col;
+        if(wEntry&&cEntry){const wc=COLORS[wEntry.categoryId];bg=`linear-gradient(135deg,${wc.bg} 55%,#4ECDC4 55%)`;col='#fff';}
+        else if(wEntry){const wc=COLORS[wEntry.categoryId];bg=wc.bg;col=wc.text;}
+        else if(cEntry){bg='#4ECDC4';col='#fff';}
+        const isActive=wEntry||cEntry;
+        return <div key={d} className={`cal-day ${isActive?'worked':''} ${isToday?'today':''}`} style={isActive?{background:bg,color:col}:{}}>{d}</div>;
+      })}
     </div>
-    <div className="cal-legend">{Object.entries(CATEGORIES).map(([k,v])=><div key={k} className="legend-item"><div className="legend-dot" style={{background:COLORS[k].bg}}/>{v.emoji} {v.label}</div>)}</div>
-    <div style={{fontSize:20,fontWeight:900,letterSpacing:'-0.5px',marginBottom:14}}>Workout Log</div>
+    <div className="cal-legend">
+      {Object.entries(CATEGORIES).map(([k,v])=><div key={k} className="legend-item"><div className="legend-dot" style={{background:COLORS[k].bg}}/>{v.emoji} {v.label}</div>)}
+      <div className="legend-item"><div className="legend-dot" style={{background:'#4ECDC4'}}/> 🍳 Kitchen</div>
+    </div>
+    <div style={{fontSize:20,fontWeight:900,letterSpacing:'-0.5px',marginBottom:14}}>Activity Log</div>
     <div className="recent-list">
-      {history.slice(0,20).map((entry,i)=>{
-        const c=COLORS[entry.categoryId];
-        const wDef=getWorkout(entry.categoryId,entry.workoutId,customWorkouts);
-        const isLight=c.text!=='#FFFFFF';
-        return (
-          <div key={i} className="recent-card" style={{background:c.bg}}>
-            <div className="recent-icon">{CATEGORIES[entry.categoryId]?.emoji}</div>
-            <div style={{flex:1}}>
-              <div className="recent-name" style={{color:c.text}}>{wDef?.label||CATEGORIES[entry.categoryId]?.label}</div>
-              <div className="recent-meta" style={{color:c.text}}>{new Date(entry.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div>
-            </div>
-            <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}>
-              <div className="recent-dur" style={{color:c.text}}>{entry.duration}m</div>
-              <div style={{display:'flex',gap:5}}>
-                <button className="log-action-btn" style={{background:'rgba(255,255,255,0.22)',color:c.text}} onClick={ev=>{ev.stopPropagation();setEditEntry(entry);}}>Edit</button>
-                <button className="log-action-btn" style={{background:isLight?'rgba(200,0,0,0.12)':'rgba(255,255,255,0.18)',color:isLight?'#CC0000':c.text}} onClick={ev=>{ev.stopPropagation();if(confirm('Delete this workout?'))onDeleteEntry(entry.id);}}>Del</button>
+      {allEntries.slice(0,30).map((entry,i)=>{
+        if(entry._type==='workout'){
+          const c=COLORS[entry.categoryId];const wDef=getWorkout(entry.categoryId,entry.workoutId,customWorkouts);const isLight=c.text!=='#FFFFFF';
+          return (
+            <div key={i} className="recent-card" style={{background:c.bg}}>
+              <div className="recent-icon">{CATEGORIES[entry.categoryId]?.emoji}</div>
+              <div style={{flex:1}}>
+                <div className="recent-name" style={{color:c.text}}>{wDef?.label||CATEGORIES[entry.categoryId]?.label}</div>
+                <div className="recent-meta" style={{color:c.text}}>{new Date(entry.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}>
+                <div className="recent-dur" style={{color:c.text}}>{entry.duration}m</div>
+                <div style={{display:'flex',gap:5}}>
+                  <button className="log-action-btn" style={{background:'rgba(255,255,255,0.22)',color:c.text}} onClick={ev=>{ev.stopPropagation();setEditEntry(entry);}}>Edit</button>
+                  <button className="log-action-btn" style={{background:isLight?'rgba(200,0,0,0.12)':'rgba(255,255,255,0.18)',color:isLight?'#CC0000':c.text}} onClick={ev=>{ev.stopPropagation();if(confirm('Delete this workout?'))onDeleteEntry(entry.id);}}>Del</button>
+                </div>
               </div>
             </div>
-          </div>
-        );
+          );
+        } else {
+          const cat=MEAL_CATEGORIES[entry.mealType||'dinner'];const c=cat.color;const isLight=c.text!=='#FFFFFF';
+          return (
+            <div key={i} className="recent-card" style={{background:c.bg}}>
+              <div className="recent-icon">{entry.emoji}</div>
+              <div style={{flex:1}}>
+                <div className="recent-name" style={{color:c.text}}>{entry.label}</div>
+                <div className="recent-meta" style={{color:c.text}}>{cat.emoji} {cat.label} · {new Date(entry.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div>
+              </div>
+              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}>
+                <div className="recent-dur" style={{color:c.text}}>{entry.duration}m</div>
+                <div style={{display:'flex',gap:5}}>
+                  <button className="log-action-btn" style={{background:isLight?'rgba(200,0,0,0.12)':'rgba(255,255,255,0.18)',color:isLight?'#CC0000':c.text}} onClick={ev=>{ev.stopPropagation();if(confirm('Delete this entry?'))onDeleteCookingEntry(entry.id);}}>Del</button>
+                </div>
+              </div>
+            </div>
+          );
+        }
       })}
     </div>
   </>);
@@ -1666,6 +1699,7 @@ function App() {
   const [showBuilder,setShowBuilder]=useState(false);
   const [showRecipeBuilder,setShowRecipeBuilder]=useState(false);
   const [homeEditEntry,setHomeEditEntry]=useState(null);
+  const [cookingLog,setCookingLog]=useState(()=>{try{return JSON.parse(localStorage.getItem('cc-cooking-log')||'[]');}catch{return [];}});
   const [favorites,setFavorites]=useState(()=>{try{return JSON.parse(localStorage.getItem('cc-favorites')||'[]');}catch{return [];}});
   const [recipeFavorites,setRecipeFavorites]=useState(()=>{try{return JSON.parse(localStorage.getItem('cc-recipe-favorites')||'[]');}catch{return [];}});
   const [customRecipes,setCustomRecipes]=useState(()=>{try{return JSON.parse(localStorage.getItem('cc-recipes')||'[]');}catch{return [];}});
@@ -1728,12 +1762,20 @@ function App() {
   const saveRecipeComment=(recipeId,comment)=>{setRecipeComments(prev=>{const updated={...prev,[recipeId]:comment};localStorage.setItem('cc-recipe-comments',JSON.stringify(updated));return updated;});};
   const deleteHistoryEntry=async id=>{setData(d=>({...d,history:d.history.filter(h=>h.id!==id)}));await sb.from('workout_history').delete().eq('id',id).eq('user_id',session.user.id);};
   const editHistoryEntry=async(id,mins)=>{setData(d=>({...d,history:d.history.map(h=>h.id===id?{...h,duration:mins}:h)}));await sb.from('workout_history').update({duration:mins}).eq('id',id).eq('user_id',session.user.id);};
-  const finishCooking=photo=>{
-    if(photo&&nav?.recipeId){
-      setRecipePhotos(prev=>{const photos=[...(prev[nav.recipeId]||[]),photo];const updated={...prev,[nav.recipeId]:photos};localStorage.setItem('cc-recipe-photos',JSON.stringify(updated));return updated;});
+  const finishCooking=(photo,mins)=>{
+    if(nav?.recipeId){
+      const recipe=getRecipe(nav.recipeId,customRecipes);
+      if(recipe){
+        const entry={id:uid(),date:new Date().toISOString().split('T')[0],recipeId:nav.recipeId,mealType:recipe.mealType||'dinner',label:recipe.label,emoji:recipe.emoji,duration:mins||1};
+        setCookingLog(prev=>{const updated=[entry,...prev];localStorage.setItem('cc-cooking-log',JSON.stringify(updated));return updated;});
+      }
+      if(photo){
+        setRecipePhotos(prev=>{const photos=[...(prev[nav.recipeId]||[]),photo];const updated={...prev,[nav.recipeId]:photos};localStorage.setItem('cc-recipe-photos',JSON.stringify(updated));return updated;});
+      }
     }
     setNav(null);setTab('kitchen');
   };
+  const deleteCookingEntry=id=>{setCookingLog(prev=>{const updated=prev.filter(e=>e.id!==id);localStorage.setItem('cc-cooking-log',JSON.stringify(updated));return updated;});};
 
   const streak=(()=>{let s=0;const t=new Date();for(let i=0;i<60;i++){const d=new Date(t);d.setDate(t.getDate()-i);if(history.find(w=>w.date===d.toISOString().split('T')[0]))s++;else if(i>0)break;}return s;})();
   const weekCount=history.filter(w=>new Date()-new Date(w.date)<7*86400000).length;
@@ -1827,7 +1869,7 @@ function App() {
         </>)}
       </>)}
 
-      {!nav&&tab==='calendar'&&<CalendarView history={history} customWorkouts={custom} onDeleteEntry={deleteHistoryEntry} onEditEntry={editHistoryEntry}/>}
+      {!nav&&tab==='calendar'&&<CalendarView history={history} customWorkouts={custom} cookingLog={cookingLog} onDeleteEntry={deleteHistoryEntry} onEditEntry={editHistoryEntry} onDeleteCookingEntry={deleteCookingEntry}/>}
       {!nav&&tab==='kitchen'&&<KitchenView onSelectMealType={key=>setNav({type:'mealCategory',mealType:key})} onSelectFavorites={()=>setNav({type:'recipeFavorites'})} customRecipes={customRecipes} recipeFavorites={recipeFavorites} onBuildRecipe={()=>setShowRecipeBuilder(true)}/>}
       {!nav&&tab==='profile'&&<ProfileView history={history} profile={profile} userEmail={userEmail} onEdit={()=>setShowEdit(true)} onSignOut={signOut}/>}
     </div>
