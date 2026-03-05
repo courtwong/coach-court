@@ -1665,6 +1665,7 @@ function App() {
   const [showEdit,setShowEdit]=useState(false);
   const [showBuilder,setShowBuilder]=useState(false);
   const [showRecipeBuilder,setShowRecipeBuilder]=useState(false);
+  const [homeEditEntry,setHomeEditEntry]=useState(null);
   const [favorites,setFavorites]=useState(()=>{try{return JSON.parse(localStorage.getItem('cc-favorites')||'[]');}catch{return [];}});
   const [recipeFavorites,setRecipeFavorites]=useState(()=>{try{return JSON.parse(localStorage.getItem('cc-recipe-favorites')||'[]');}catch{return [];}});
   const [customRecipes,setCustomRecipes]=useState(()=>{try{return JSON.parse(localStorage.getItem('cc-recipes')||'[]');}catch{return [];}});
@@ -1752,6 +1753,7 @@ function App() {
     {showEdit&&<EditProfileModal profile={profile} onSave={saveProfile} onClose={()=>setShowEdit(false)}/>}
     {showBuilder&&<WorkoutBuilder onSave={saveWorkout} onClose={()=>setShowBuilder(false)}/>}
     {showRecipeBuilder&&<RecipeBuilder defaultMealType={nav?.mealType} onSave={saveRecipe} onClose={()=>setShowRecipeBuilder(false)}/>}
+    {homeEditEntry&&<EditWorkoutModal entry={homeEditEntry} onSave={(id,mins)=>{editHistoryEntry(id,mins);setHomeEditEntry(null);}} onClose={()=>setHomeEditEntry(null)} customWorkouts={custom}/>}
 
     <div className="topbar">
       <div className="topbar-left">
@@ -1821,7 +1823,7 @@ function App() {
         <button className="build-btn" style={{marginTop:12}} onClick={()=>setShowBuilder(true)}>✨ Build a Workout</button>
         {history.length>0&&(<>
           <div className="section-title">Recent</div>
-          <div className="recent-list">{history.slice(0,4).map((e,i)=>{const c=COLORS[e.categoryId];const wDef=getWorkout(e.categoryId,e.workoutId,custom);return <div key={i} className="recent-card" style={{background:c.bg}}><div className="recent-icon">{CATEGORIES[e.categoryId]?.emoji}</div><div style={{flex:1}}><div className="recent-name" style={{color:c.text}}>{wDef?.label||CATEGORIES[e.categoryId]?.label}</div><div className="recent-meta" style={{color:c.text}}>{new Date(e.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div></div><div className="recent-dur" style={{color:c.text}}>{e.duration}m</div></div>;})} </div>
+          <div className="recent-list">{history.slice(0,4).map((e,i)=>{const c=COLORS[e.categoryId];const wDef=getWorkout(e.categoryId,e.workoutId,custom);const isLight=c.text!=='#FFFFFF';return <div key={i} className="recent-card" style={{background:c.bg}}><div className="recent-icon">{CATEGORIES[e.categoryId]?.emoji}</div><div style={{flex:1}}><div className="recent-name" style={{color:c.text}}>{wDef?.label||CATEGORIES[e.categoryId]?.label}</div><div className="recent-meta" style={{color:c.text}}>{new Date(e.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div></div><div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}><div className="recent-dur" style={{color:c.text}}>{e.duration}m</div><div style={{display:'flex',gap:5}}><button className="log-action-btn" style={{background:'rgba(255,255,255,0.22)',color:c.text}} onClick={ev=>{ev.stopPropagation();setHomeEditEntry(e);}}>Edit</button><button className="log-action-btn" style={{background:isLight?'rgba(200,0,0,0.12)':'rgba(255,255,255,0.18)',color:isLight?'#CC0000':c.text}} onClick={ev=>{ev.stopPropagation();if(confirm('Delete this workout?'))deleteHistoryEntry(e.id);}}>Del</button></div></div></div>;})} </div>
         </>)}
       </>)}
 
