@@ -671,14 +671,13 @@ function RestScreen({seconds,restType,nextName,color,onDone}) {
       <div className="rest-ring-wrap">
         <svg className="rest-ring" viewBox="0 0 220 220">
           <circle cx="110" cy="110" r={r} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="8"/>
-          <circle cx="110" cy="110" r={r} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="8" strokeDasharray={circ} strokeDashoffset={circ*(1-pct)} strokeLinecap="round" transform="rotate(-90 110 110)" style={{transition:'stroke-dashoffset 0.5s linear'}}/>
+          <circle cx="110" cy="110" r={r} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="8" strokeDasharray={circ} strokeDashoffset={circ*(1-pct)} strokeLinecap="round" transform="translate(220,0) scale(-1,1) rotate(-90 110 110)" style={{transition:'stroke-dashoffset 0.5s linear'}}/>
         </svg>
         <div className="rest-timer-inner"><div className="rest-lbl">Rest</div><div className="rest-time" style={urgent?{animation:'timerPulse 0.5s ease infinite alternate'}:{}}>{fmt(left)}</div></div>
       </div>
       <div style={{display:'flex',gap:10,alignItems:'center'}}>
-        <button className="skip-btn" style={{padding:'12px 22px'}} onClick={()=>adjust(-15)}>−15s</button>
         <button className="skip-btn" onClick={onDone}>Skip Rest</button>
-        <button className="skip-btn" style={{padding:'12px 22px'}} onClick={()=>adjust(15)}>+15s</button>
+        <button className="skip-btn" style={{padding:'12px 22px'}} onClick={()=>adjust(-15)}>−15s</button>
       </div>
     </div>
   );
@@ -1261,7 +1260,7 @@ function CategoryDetail({categoryId,onBack,onStart,customWorkouts,onDelete,onBui
         <div className="ex-list">{w.steps.map((s,i)=><div key={i} className="ex-row"><div className="ex-num" style={{color:col.text}}>{i+1}</div><div className="ex-name" style={{color:col.text}}>{sLabel(s)}{s.type==='superset'&&<span className="ss-tag">SS</span>}</div><div className="ex-meta" style={{color:col.text}}>{s.sets}×{Array.isArray(s.reps)?s.reps[0]:s.reps}</div></div>)}</div>
         <button className="start-btn" style={{background:'rgba(0,0,0,0.75)',color:'#fff'}} onClick={()=>onStart(categoryId,w.id)}>Start Workout →</button>
       </div>
-    );})}}</div>
+    );})}</div>
     <button className="build-btn" style={{marginTop:16}} onClick={onBuild}>✨ Build a Workout</button>
   </>);
 }
@@ -1899,6 +1898,7 @@ function App() {
             })}
           </div>
         </>)}
+        <CalendarView history={history} customWorkouts={custom} cookingLog={cookingLog} onDeleteEntry={deleteHistoryEntry} onEditEntry={editHistoryEntry} onDeleteCookingEntry={deleteCookingEntry}/>
       </>)}
 
       {!nav&&tab==='fitness'&&(<>
@@ -1944,7 +1944,6 @@ function App() {
         </>)}
       </>)}
 
-      {!nav&&tab==='calendar'&&<CalendarView history={history} customWorkouts={custom} cookingLog={cookingLog} onDeleteEntry={deleteHistoryEntry} onEditEntry={editHistoryEntry} onDeleteCookingEntry={deleteCookingEntry}/>}
       {!nav&&tab==='kitchen'&&<KitchenView onSelectMealType={key=>setNav({type:'mealCategory',mealType:key})} onSelectFavorites={()=>setNav({type:'recipeFavorites'})} customRecipes={customRecipes} recipeFavorites={recipeFavorites} onBuildRecipe={()=>setShowRecipeBuilder(true)}/>}
       {!nav&&tab==='profile'&&<ProfileView history={history} profile={profile} userEmail={userEmail} onEdit={()=>setShowEdit(true)} onSignOut={signOut}/>}
     </div>
@@ -1952,7 +1951,7 @@ function App() {
     {!nav&&(
       <div className="nav-wrap">
         <div className="nav-inner">
-          {[{key:'home',icon:'🏠',label:'Home'},{key:'fitness',icon:'💪',label:'Fitness'},{key:'calendar',icon:'📅',label:'Log'},{key:'kitchen',icon:'🍳',label:'Kitchen'},{key:'profile',icon:'📊',label:'Account'}].map(({key,icon,label})=>(
+          {[{key:'home',icon:'🏠',label:'Home'},{key:'fitness',icon:'💪',label:'Fitness'},{key:'kitchen',icon:'🍳',label:'Kitchen'},{key:'profile',icon:'📊',label:'Account'}].map(({key,icon,label})=>(
             <button key={key} className={`nav-btn ${tab===key?'active':''}`} onClick={()=>{setTab(key);setNav(null);}}>
               <div className="nav-icon">{icon}</div>
               <div className="nav-label">{label}</div>
