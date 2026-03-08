@@ -221,6 +221,8 @@
     .rest-time { font-size:72px; font-weight:900; line-height:1; letter-spacing:-3px; color:#fff; }
     .skip-btn { background:rgba(255,255,255,0.2); border:2px solid rgba(255,255,255,0.35); border-radius:50px; padding:12px 36px; font-size:14px; font-weight:800; color:#fff; cursor:pointer; font-family:'Inter',sans-serif; text-transform:uppercase; letter-spacing:0.5px; }
 
+    @keyframes timerPulse { from{transform:scale(1)} to{transform:scale(1.08)} }
+
     /* FINISH */
     .finish-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:85vh; text-align:center; gap:14px; padding:32px 24px; }
     .finish-emoji { font-size:72px; animation:bounce 0.8s ease infinite alternate; }
@@ -638,23 +640,46 @@ function AuthScreen() {
 
 // ─── REST ─────────────────────────────────────────────────────────────────────
 function RestScreen({seconds,restType,nextName,color,onDone}) {
+  const endTimeRef=useRef(Date.now()+seconds*1000);
+  const totalRef=useRef(seconds);
   const [left,setLeft]=useState(seconds);
-  const total=useRef(seconds);
-  useEffect(()=>{ if(left<=0){onDone();return;} const t=setTimeout(()=>setLeft(l=>l-1),1000); return()=>clearTimeout(t); },[left]);
-  const pct=left/total.current,r=90,circ=2*Math.PI*r;
+  useEffect(()=>{
+    let id;
+    const tick=()=>{
+      const rem=Math.max(0,Math.round((endTimeRef.current-Date.now())/1000));
+      setLeft(rem);
+      if(rem<=0){clearInterval(id);onDone();return;}
+    };
+    tick();
+    id=setInterval(tick,500);
+    return()=>clearInterval(id);
+  },[]);
+  const adjust=delta=>{
+    endTimeRef.current+=delta*1000;
+    if(delta>0)totalRef.current+=delta;
+    setLeft(Math.max(0,Math.round((endTimeRef.current-Date.now())/1000)));
+  };
+  const pct=Math.min(1,totalRef.current>0?left/totalRef.current:0);
+  const r=90,circ=2*Math.PI*r;
+  const urgent=left>0&&left<=10;
+  const bg=urgent?'#FF3B30':color;
   return (
-    <div className="rest-screen" style={{background:color}}>
+    <div className="rest-screen" style={{background:bg,transition:'background 0.6s ease'}}>
       <div className="rest-tag">{restType==='between-sets'?'Between Sets':'Between Exercises'}</div>
       <div className="rest-next-lbl">Up next</div>
       <div className="rest-next-name">{nextName}</div>
       <div className="rest-ring-wrap">
         <svg className="rest-ring" viewBox="0 0 220 220">
           <circle cx="110" cy="110" r={r} fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="8"/>
-          <circle cx="110" cy="110" r={r} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="8" strokeDasharray={circ} strokeDashoffset={circ*(1-pct)} strokeLinecap="round" transform="rotate(-90 110 110)" style={{transition:'stroke-dashoffset 1s linear'}}/>
+          <circle cx="110" cy="110" r={r} fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="8" strokeDasharray={circ} strokeDashoffset={circ*(1-pct)} strokeLinecap="round" transform="rotate(-90 110 110)" style={{transition:'stroke-dashoffset 0.5s linear'}}/>
         </svg>
-        <div className="rest-timer-inner"><div className="rest-lbl">Rest</div><div className="rest-time">{fmt(left)}</div></div>
+        <div className="rest-timer-inner"><div className="rest-lbl">Rest</div><div className="rest-time" style={urgent?{animation:'timerPulse 0.5s ease infinite alternate'}:{}}>{fmt(left)}</div></div>
       </div>
-      <button className="skip-btn" onClick={onDone}>Skip Rest</button>
+      <div style={{display:'flex',gap:10,alignItems:'center'}}>
+        <button className="skip-btn" style={{padding:'12px 22px'}} onClick={()=>adjust(-15)}>−15s</button>
+        <button className="skip-btn" onClick={onDone}>Skip Rest</button>
+        <button className="skip-btn" style={{padding:'12px 22px'}} onClick={()=>adjust(15)}>+15s</button>
+      </div>
     </div>
   );
 }
@@ -784,6 +809,14 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
   const [restInfo,setRestInfo]=useState({});
   const [weights,setWeights]=useState(()=>{const w={};steps.forEach(s=>sNames(s).forEach(n=>{w[n]=weightHistory[n]||0;}));return w;});
   const startTime=useRef(Date.now());
+  useEffect(()=>{
+    let wakeLock=null;
+    const requestWL=async()=>{try{if('wakeLock' in navigator)wakeLock=await navigator.wakeLock.request('screen');}catch(e){}};
+    requestWL();
+    const onVis=()=>{if(document.visibilityState==='visible')requestWL();};
+    document.addEventListener('visibilitychange',onVis);
+    return()=>{wakeLock?.release();document.removeEventListener('visibilitychange',onVis);};
+  },[]);
   const cur=seq[si]||seq[seq.length-1];
   const curStep=steps[cur.stepIdx];
   const isLastSeq=si>=seq.length-1;
@@ -1784,6 +1817,8 @@ function App() {
   const greetWord=hour<12?'Morning':hour<17?'Afternoon':'Evening';
   const firstName=profile.name?.split(' ')[0]||'there';
   const weekDays=Array.from({length:7}).map((_,i)=>{const d=new Date();d.setDate(d.getDate()-6+i);const ds=d.toISOString().split('T')[0];return{label:['S','M','T','W','T','F','S'][d.getDay()],num:d.getDate(),ds,worked:!!history.find(w=>w.date===ds),isToday:i===6};});
+  const weekKitchenCount=cookingLog.filter(e=>new Date()-new Date(e.date+'T00:00:00')<7*86400000).length;
+  const recentAll=[...history.map(e=>({...e,_type:'workout'})),...cookingLog.map(e=>({...e,_type:'cooking'}))].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,4);
 
   if(session===undefined) return <div className="loading-screen"><div className="loading-wordmark">Coach <span>Court</span></div><div className="spinner"/></div>;
   if(!session) return <AuthScreen/>;
@@ -1819,15 +1854,55 @@ function App() {
       {!nav&&tab==='home'&&(<>
         <div style={{marginTop:14,marginBottom:18}}>
           <div className="week-strip">
-            {weekDays.map((d,i)=><div key={i} className="week-day"><div className="week-day-label">{d.label}</div><div className={`week-day-dot ${d.worked?'worked':''} ${d.isToday?'today':''}`}>{d.num}</div></div>)}
+            {weekDays.map((d,i)=>{
+              const hasKitchen=!!(cookingLog.find(c=>c.date===d.ds));
+              return (
+                <div key={i} className="week-day">
+                  <div className="week-day-label">{d.label}</div>
+                  <div className={`week-day-dot ${d.worked?'worked':''} ${d.isToday?'today':''}`}
+                    style={!d.worked&&hasKitchen?{background:'#4ECDC4',color:'#fff'}:{}}
+                  >{d.num}</div>
+                  {hasKitchen&&d.worked&&<div style={{width:5,height:5,borderRadius:'50%',background:'#4ECDC4',marginTop:1}}/>}
+                </div>
+              );
+            })}
           </div>
         </div>
         <div className="stats-row">
-          <div className="stat-card" style={{background:COLORS.lower.bg}}><div className="stat-num" style={{color:COLORS.lower.text}}>{weekCount}</div><div className="stat-lbl" style={{color:COLORS.lower.text}}>This Week</div></div>
-          <div className="stat-card" style={{background:COLORS.fullbody.bg}}><div className="stat-num" style={{color:COLORS.fullbody.text}}>{weekMins}m</div><div className="stat-lbl" style={{color:COLORS.fullbody.text}}>Minutes</div></div>
-          <div className="stat-card" style={{background:COLORS.cardio.bg}}><div className="stat-num" style={{color:COLORS.cardio.text}}>{history.length}</div><div className="stat-lbl" style={{color:COLORS.cardio.text}}>All Time</div></div>
+          <div className="stat-card" style={{background:COLORS.lower.bg}}><div className="stat-num" style={{color:COLORS.lower.text}}>{weekCount}</div><div className="stat-lbl" style={{color:COLORS.lower.text}}>Workouts</div></div>
+          <div className="stat-card" style={{background:COLORS.kitchen.bg}}><div className="stat-num" style={{color:COLORS.kitchen.text}}>{weekKitchenCount}</div><div className="stat-lbl" style={{color:COLORS.kitchen.text}}>Cooked</div></div>
+          <div className="stat-card" style={{background:COLORS.cardio.bg}}><div className="stat-num" style={{color:COLORS.cardio.text}}>{weekMins}m</div><div className="stat-lbl" style={{color:COLORS.cardio.text}}>Minutes</div></div>
         </div>
-        <div className="section-title">Workouts</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginTop:24,marginBottom:4}}>
+          <div className="category-card" style={{background:COLORS.upper.bg,padding:'18px 18px 14px',cursor:'pointer'}} onClick={()=>setTab('fitness')}>
+            <div style={{fontSize:26,marginBottom:7}}>💪</div>
+            <div style={{fontSize:20,fontWeight:900,letterSpacing:'-0.5px',color:COLORS.upper.text,lineHeight:1.1}}>Fitness</div>
+            <div style={{fontSize:12,fontWeight:600,opacity:0.55,color:COLORS.upper.text,marginTop:4}}>{history.length} session{history.length!==1?'s':''}</div>
+          </div>
+          <div className="category-card" style={{background:COLORS.kitchen.bg,padding:'18px 18px 14px',cursor:'pointer'}} onClick={()=>setTab('kitchen')}>
+            <div style={{fontSize:26,marginBottom:7}}>🍳</div>
+            <div style={{fontSize:20,fontWeight:900,letterSpacing:'-0.5px',color:COLORS.kitchen.text,lineHeight:1.1}}>Kitchen</div>
+            <div style={{fontSize:12,fontWeight:600,opacity:0.55,color:COLORS.kitchen.text,marginTop:4}}>{cookingLog.length} recipe{cookingLog.length!==1?'s':''}</div>
+          </div>
+        </div>
+        {recentAll.length>0&&(<>
+          <div className="section-title">Recent Activity</div>
+          <div className="recent-list">
+            {recentAll.map((entry,i)=>{
+              if(entry._type==='workout'){
+                const c=COLORS[entry.categoryId];const wDef=getWorkout(entry.categoryId,entry.workoutId,custom);const isLight=c.text!=='#FFFFFF';
+                return <div key={i} className="recent-card" style={{background:c.bg}}><div className="recent-icon">{CATEGORIES[entry.categoryId]?.emoji}</div><div style={{flex:1}}><div className="recent-name" style={{color:c.text}}>{wDef?.label||CATEGORIES[entry.categoryId]?.label}</div><div className="recent-meta" style={{color:c.text}}>{new Date(entry.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div></div><div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}><div className="recent-dur" style={{color:c.text}}>{entry.duration}m</div><div style={{display:'flex',gap:5}}><button className="log-action-btn" style={{background:'rgba(255,255,255,0.22)',color:c.text}} onClick={ev=>{ev.stopPropagation();setHomeEditEntry(entry);}}>Edit</button><button className="log-action-btn" style={{background:isLight?'rgba(200,0,0,0.12)':'rgba(255,255,255,0.18)',color:isLight?'#CC0000':c.text}} onClick={ev=>{ev.stopPropagation();if(confirm('Delete this workout?'))deleteHistoryEntry(entry.id);}}>Del</button></div></div></div>;
+              } else {
+                const cat=MEAL_CATEGORIES[entry.mealType||'dinner'];
+                return <div key={i} className="recent-card" style={{background:'#4ECDC4'}}><div className="recent-icon">{entry.emoji}</div><div style={{flex:1}}><div className="recent-name" style={{color:'#fff'}}>{entry.label}</div><div className="recent-meta" style={{color:'#fff'}}>{cat.emoji} {cat.label} · {new Date(entry.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div></div><div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}><div className="recent-dur" style={{color:'#fff'}}>{entry.duration}m</div><div style={{display:'flex',gap:5}}><button className="log-action-btn" style={{background:'rgba(255,255,255,0.22)',color:'#fff'}} onClick={ev=>{ev.stopPropagation();if(confirm('Delete this entry?'))deleteCookingEntry(entry.id);}}>Del</button></div></div></div>;
+              }
+            })}
+          </div>
+        </>)}
+      </>)}
+
+      {!nav&&tab==='fitness'&&(<>
+        <div className="section-title" style={{marginTop:14}}>Workouts</div>
         <div className="category-list">
           {favorites.length>0&&(
             <div className="category-card" style={{background:'#FFD700'}} onClick={()=>setNav({type:'favorites'})}>
@@ -1865,7 +1940,7 @@ function App() {
         <button className="build-btn" style={{marginTop:12}} onClick={()=>setShowBuilder(true)}>✨ Build a Workout</button>
         {history.length>0&&(<>
           <div className="section-title">Recent</div>
-          <div className="recent-list">{history.slice(0,4).map((e,i)=>{const c=COLORS[e.categoryId];const wDef=getWorkout(e.categoryId,e.workoutId,custom);const isLight=c.text!=='#FFFFFF';return <div key={i} className="recent-card" style={{background:c.bg}}><div className="recent-icon">{CATEGORIES[e.categoryId]?.emoji}</div><div style={{flex:1}}><div className="recent-name" style={{color:c.text}}>{wDef?.label||CATEGORIES[e.categoryId]?.label}</div><div className="recent-meta" style={{color:c.text}}>{new Date(e.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div></div><div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}><div className="recent-dur" style={{color:c.text}}>{e.duration}m</div><div style={{display:'flex',gap:5}}><button className="log-action-btn" style={{background:'rgba(255,255,255,0.22)',color:c.text}} onClick={ev=>{ev.stopPropagation();setHomeEditEntry(e);}}>Edit</button><button className="log-action-btn" style={{background:isLight?'rgba(200,0,0,0.12)':'rgba(255,255,255,0.18)',color:isLight?'#CC0000':c.text}} onClick={ev=>{ev.stopPropagation();if(confirm('Delete this workout?'))deleteHistoryEntry(e.id);}}>Del</button></div></div></div>;})} </div>
+          <div className="recent-list">{history.slice(0,3).map((e,i)=>{const c=COLORS[e.categoryId];const wDef=getWorkout(e.categoryId,e.workoutId,custom);const isLight=c.text!=='#FFFFFF';return <div key={i} className="recent-card" style={{background:c.bg}}><div className="recent-icon">{CATEGORIES[e.categoryId]?.emoji}</div><div style={{flex:1}}><div className="recent-name" style={{color:c.text}}>{wDef?.label||CATEGORIES[e.categoryId]?.label}</div><div className="recent-meta" style={{color:c.text}}>{new Date(e.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div></div><div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',gap:6}}><div className="recent-dur" style={{color:c.text}}>{e.duration}m</div><div style={{display:'flex',gap:5}}><button className="log-action-btn" style={{background:'rgba(255,255,255,0.22)',color:c.text}} onClick={ev=>{ev.stopPropagation();setHomeEditEntry(e);}}>Edit</button><button className="log-action-btn" style={{background:isLight?'rgba(200,0,0,0.12)':'rgba(255,255,255,0.18)',color:isLight?'#CC0000':c.text}} onClick={ev=>{ev.stopPropagation();if(confirm('Delete this workout?'))deleteHistoryEntry(e.id);}}>Del</button></div></div></div>;})} </div>
         </>)}
       </>)}
 
@@ -1877,7 +1952,7 @@ function App() {
     {!nav&&(
       <div className="nav-wrap">
         <div className="nav-inner">
-          {[{key:'home',icon:'🏠',label:'Home'},{key:'calendar',icon:'📅',label:'Log'},{key:'kitchen',icon:'🍳',label:'Kitchen'},{key:'profile',icon:'📊',label:'Account'}].map(({key,icon,label})=>(
+          {[{key:'home',icon:'🏠',label:'Home'},{key:'fitness',icon:'💪',label:'Fitness'},{key:'calendar',icon:'📅',label:'Log'},{key:'kitchen',icon:'🍳',label:'Kitchen'},{key:'profile',icon:'📊',label:'Account'}].map(({key,icon,label})=>(
             <button key={key} className={`nav-btn ${tab===key?'active':''}`} onClick={()=>{setTab(key);setNav(null);}}>
               <div className="nav-icon">{icon}</div>
               <div className="nav-label">{label}</div>
