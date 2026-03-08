@@ -1287,15 +1287,44 @@ function EditWorkoutModal({entry,onSave,onClose,customWorkouts}) {
 }
 
 // ─── SCHEDULE MODAL ───────────────────────────────────────────────────────────
-function ScheduleModal({dateStr,existing,onSave,onDelete,onClose}) {
+function ScheduleModal({dateStr,existing,onSave,onDelete,onClose,customWorkouts,customRecipes}) {
   const [type,setType]=useState('workout');
   const [categoryId,setCategoryId]=useState('lower');
   const [mealType,setMealType]=useState('dinner');
+  const [workoutId,setWorkoutId]=useState(null);   // null = "any"
+  const [recipeId,setRecipeId]=useState(null);     // null = "any"
   const displayDate=new Date(dateStr+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+
+  // Reset specific selection when broad category changes
+  const selectCategory=key=>{setCategoryId(key);setWorkoutId(null);};
+  const selectMealType=key=>{setMealType(key);setRecipeId(null);};
+
+  // Workouts available in the selected category
+  const catWorkouts=[...(CATEGORIES[categoryId]?.workouts||[]),...(customWorkouts||[]).filter(w=>w.categoryId===categoryId)];
+  // Recipes available for the selected meal type
+  const mealRecipes=[...RECIPES,...(customRecipes||[])].filter(r=>r.mealType===mealType);
+
   const save=()=>{
-    if(type==='workout'){const cat=CATEGORIES[categoryId];onSave({id:uid(),date:dateStr,type:'workout',categoryId,label:cat.label,emoji:cat.emoji});}
-    else{const cat=MEAL_CATEGORIES[mealType];onSave({id:uid(),date:dateStr,type:'meal',mealType,label:cat.label,emoji:cat.emoji});}
+    if(type==='workout'){
+      if(workoutId){
+        const w=catWorkouts.find(w=>w.id===workoutId)||{};
+        onSave({id:uid(),date:dateStr,type:'workout',categoryId,workoutId,label:w.label,emoji:w.emoji||CATEGORIES[categoryId].emoji});
+      } else {
+        const cat=CATEGORIES[categoryId];
+        onSave({id:uid(),date:dateStr,type:'workout',categoryId,label:cat.label,emoji:cat.emoji});
+      }
+    } else {
+      if(recipeId){
+        const r=mealRecipes.find(r=>r.id===recipeId)||{};
+        onSave({id:uid(),date:dateStr,type:'meal',mealType,recipeId,label:r.label,emoji:r.emoji});
+      } else {
+        const cat=MEAL_CATEGORIES[mealType];
+        onSave({id:uid(),date:dateStr,type:'meal',mealType,label:cat.label,emoji:cat.emoji});
+      }
+    }
   };
+
+  const col=COLORS[categoryId];
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
@@ -1318,24 +1347,51 @@ function ScheduleModal({dateStr,existing,onSave,onDelete,onClose}) {
           </div>
         )}
         <div style={{fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:1,color:'var(--muted)',marginBottom:12}}>Add to Plan</div>
+
+        {/* Type toggle */}
         <div style={{display:'flex',gap:8,marginBottom:16}}>
           <button className={`filter-btn ${type==='workout'?'active':''}`} onClick={()=>setType('workout')}>💪 Workout</button>
           <button className={`filter-btn ${type==='meal'?'active':''}`} onClick={()=>setType('meal')}>🍳 Meal</button>
         </div>
-        {type==='workout'&&(
-          <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:20}}>
+
+        {type==='workout'&&(<>
+          {/* Category row */}
+          <div style={{fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:1,color:'var(--muted)',marginBottom:8}}>Category</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:16}}>
             {Object.entries(CATEGORIES).map(([key,cat])=>(
-              <button key={key} style={{background:categoryId===key?COLORS[key].bg:'var(--bg2)',color:categoryId===key?COLORS[key].text:'var(--text)',border:'none',borderRadius:50,padding:'8px 16px',fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}} onClick={()=>setCategoryId(key)}>{cat.emoji} {cat.label}</button>
+              <button key={key} style={{background:categoryId===key?COLORS[key].bg:'var(--bg2)',color:categoryId===key?COLORS[key].text:'var(--text)',border:'none',borderRadius:50,padding:'8px 16px',fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}} onClick={()=>selectCategory(key)}>{cat.emoji} {cat.label}</button>
             ))}
           </div>
-        )}
-        {type==='meal'&&(
+          {/* Specific workout row */}
+          <div style={{fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:1,color:'var(--muted)',marginBottom:8}}>Workout</div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:20}}>
+            <button style={{background:workoutId===null?col.bg:'var(--bg2)',color:workoutId===null?col.text:'var(--text)',border:'none',borderRadius:50,padding:'8px 16px',fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}} onClick={()=>setWorkoutId(null)}>Any {CATEGORIES[categoryId]?.label}</button>
+            {catWorkouts.map(w=>(
+              <button key={w.id} style={{background:workoutId===w.id?col.bg:'var(--bg2)',color:workoutId===w.id?col.text:'var(--text)',border:'none',borderRadius:50,padding:'8px 16px',fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}} onClick={()=>setWorkoutId(w.id)}>{w.emoji} {w.label}</button>
+            ))}
+            {catWorkouts.length===0&&<div style={{fontSize:13,color:'var(--muted)',fontStyle:'italic',padding:'8px 0'}}>No workouts in this category yet</div>}
+          </div>
+        </>)}
+
+        {type==='meal'&&(<>
+          {/* Meal type row */}
+          <div style={{fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:1,color:'var(--muted)',marginBottom:8}}>Meal Type</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:16}}>
             {Object.entries(MEAL_CATEGORIES).map(([key,cat])=>(
-              <button key={key} style={{background:mealType===key?'#4ECDC4':'var(--bg2)',color:mealType===key?'#fff':'var(--text)',border:'none',borderRadius:50,padding:'8px 16px',fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}} onClick={()=>setMealType(key)}>{cat.emoji} {cat.label}</button>
+              <button key={key} style={{background:mealType===key?'#4ECDC4':'var(--bg2)',color:mealType===key?'#fff':'var(--text)',border:'none',borderRadius:50,padding:'8px 16px',fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}} onClick={()=>selectMealType(key)}>{cat.emoji} {cat.label}</button>
             ))}
           </div>
-        )}
+          {/* Specific recipe row */}
+          <div style={{fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:1,color:'var(--muted)',marginBottom:8}}>Recipe</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:20}}>
+            <button style={{background:recipeId===null?'#4ECDC4':'var(--bg2)',color:recipeId===null?'#fff':'var(--text)',border:'none',borderRadius:50,padding:'8px 16px',fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}} onClick={()=>setRecipeId(null)}>Any {MEAL_CATEGORIES[mealType]?.label}</button>
+            {mealRecipes.map(r=>(
+              <button key={r.id} style={{background:recipeId===r.id?'#4ECDC4':'var(--bg2)',color:recipeId===r.id?'#fff':'var(--text)',border:'none',borderRadius:50,padding:'8px 16px',fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}} onClick={()=>setRecipeId(r.id)}>{r.emoji} {r.label}</button>
+            ))}
+            {mealRecipes.length===0&&<div style={{fontSize:13,color:'var(--muted)',fontStyle:'italic',padding:'8px 0'}}>No recipes for this meal type yet</div>}
+          </div>
+        </>)}
+
         <div className="modal-actions">
           <button className="modal-cancel" onClick={onClose}>Done</button>
           <button className="modal-save" onClick={save}>+ Add to Plan</button>
@@ -1346,7 +1402,7 @@ function ScheduleModal({dateStr,existing,onSave,onDelete,onClose}) {
 }
 
 // ─── CALENDAR ─────────────────────────────────────────────────────────────────
-function CalendarView({history,customWorkouts,cookingLog,onDeleteEntry,onEditEntry,onDeleteCookingEntry,scheduledItems,onAddSchedule,onDeleteSchedule}) {
+function CalendarView({history,customWorkouts,cookingLog,onDeleteEntry,onEditEntry,onDeleteCookingEntry,scheduledItems,onAddSchedule,onDeleteSchedule,customRecipes}) {
   const today=new Date();const yr=today.getFullYear(),mo=today.getMonth();
   const todayStr=today.toISOString().split('T')[0];
   const firstDay=new Date(yr,mo,1).getDay();const days=new Date(yr,mo+1,0).getDate();
@@ -1359,7 +1415,7 @@ function CalendarView({history,customWorkouts,cookingLog,onDeleteEntry,onEditEnt
   const upcoming=(scheduledItems||[]).filter(s=>s.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date));
   return (<>
     {editEntry&&<EditWorkoutModal entry={editEntry} onSave={(id,mins)=>{onEditEntry(id,mins);setEditEntry(null);}} onClose={()=>setEditEntry(null)} customWorkouts={customWorkouts}/>}
-    {schedModal&&<ScheduleModal dateStr={schedModal} existing={smap[schedModal]||[]} onSave={item=>{onAddSchedule(item);}} onDelete={id=>onDeleteSchedule(id)} onClose={()=>setSchedModal(null)}/>}
+    {schedModal&&<ScheduleModal dateStr={schedModal} existing={smap[schedModal]||[]} onSave={item=>{onAddSchedule(item);}} onDelete={id=>onDeleteSchedule(id)} onClose={()=>setSchedModal(null)} customWorkouts={customWorkouts} customRecipes={customRecipes}/>}
     <div style={{marginBottom:24,marginTop:28}}>
       <div style={{fontSize:32,fontWeight:900,letterSpacing:'-1.5px',marginBottom:4}}>{today.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>
       <div style={{fontSize:14,fontWeight:500,color:'var(--muted)'}}>{history.length} workout{history.length!==1?'s':''} · {(cookingLog||[]).length} recipe{(cookingLog||[]).length!==1?'s':''} cooked</div>
@@ -1949,38 +2005,10 @@ function App() {
       {nav?.type==='recipeDetail'&&<RecipeDetail recipeId={nav.recipeId} onBack={()=>setNav(nav.fromFavorites?{type:'recipeFavorites'}:{type:'mealCategory',mealType:nav.fromMealType||'dinner'})} onStartCooking={id=>setNav({type:'cooking',recipeId:id})} customRecipes={customRecipes} recipePhotos={recipePhotos} onSavePhoto={saveRecipePhoto} recipeComments={recipeComments} onSaveComment={saveRecipeComment} onDeleteRecipe={id=>{deleteRecipe(id);setNav(nav.fromFavorites?{type:'recipeFavorites'}:{type:'mealCategory',mealType:nav.fromMealType||'dinner'});}}/>}
 
       {!nav&&tab==='home'&&(<>
-        <div style={{marginTop:14,marginBottom:18}}>
-          <div className="week-strip">
-            {weekDays.map((d,i)=>{
-              const hasKitchen=!!(cookingLog.find(c=>c.date===d.ds));
-              return (
-                <div key={i} className="week-day">
-                  <div className="week-day-label">{d.label}</div>
-                  <div className={`week-day-dot ${d.worked?'worked':''} ${d.isToday?'today':''}`}
-                    style={!d.worked&&hasKitchen?{background:'#4ECDC4',color:'#fff'}:{}}
-                  >{d.num}</div>
-                  {hasKitchen&&d.worked&&<div style={{width:5,height:5,borderRadius:'50%',background:'#4ECDC4',marginTop:1}}/>}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        <div className="stats-row">
+        <div className="stats-row" style={{marginTop:14}}>
           <div className="stat-card" style={{background:COLORS.lower.bg}}><div className="stat-num" style={{color:COLORS.lower.text}}>{weekCount}</div><div className="stat-lbl" style={{color:COLORS.lower.text}}>Workouts</div></div>
           <div className="stat-card" style={{background:COLORS.kitchen.bg}}><div className="stat-num" style={{color:COLORS.kitchen.text}}>{weekKitchenCount}</div><div className="stat-lbl" style={{color:COLORS.kitchen.text}}>Cooked</div></div>
           <div className="stat-card" style={{background:COLORS.cardio.bg}}><div className="stat-num" style={{color:COLORS.cardio.text}}>{weekMins}m</div><div className="stat-lbl" style={{color:COLORS.cardio.text}}>Minutes</div></div>
-        </div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginTop:24,marginBottom:4}}>
-          <div className="category-card" style={{background:COLORS.upper.bg,padding:'18px 18px 14px',cursor:'pointer'}} onClick={()=>setTab('fitness')}>
-            <div style={{fontSize:26,marginBottom:7}}>💪</div>
-            <div style={{fontSize:20,fontWeight:900,letterSpacing:'-0.5px',color:COLORS.upper.text,lineHeight:1.1}}>Fitness</div>
-            <div style={{fontSize:12,fontWeight:600,opacity:0.55,color:COLORS.upper.text,marginTop:4}}>{history.length} session{history.length!==1?'s':''}</div>
-          </div>
-          <div className="category-card" style={{background:COLORS.kitchen.bg,padding:'18px 18px 14px',cursor:'pointer'}} onClick={()=>setTab('kitchen')}>
-            <div style={{fontSize:26,marginBottom:7}}>🍳</div>
-            <div style={{fontSize:20,fontWeight:900,letterSpacing:'-0.5px',color:COLORS.kitchen.text,lineHeight:1.1}}>Kitchen</div>
-            <div style={{fontSize:12,fontWeight:600,opacity:0.55,color:COLORS.kitchen.text,marginTop:4}}>{cookingLog.length} recipe{cookingLog.length!==1?'s':''}</div>
-          </div>
         </div>
         {recentAll.length>0&&(<>
           <div className="section-title">Recent Activity</div>
@@ -1996,7 +2024,7 @@ function App() {
             })}
           </div>
         </>)}
-        <CalendarView history={history} customWorkouts={custom} cookingLog={cookingLog} onDeleteEntry={deleteHistoryEntry} onEditEntry={editHistoryEntry} onDeleteCookingEntry={deleteCookingEntry} scheduledItems={scheduledItems} onAddSchedule={addScheduledItem} onDeleteSchedule={deleteScheduledItem}/>
+        <CalendarView history={history} customWorkouts={custom} cookingLog={cookingLog} onDeleteEntry={deleteHistoryEntry} onEditEntry={editHistoryEntry} onDeleteCookingEntry={deleteCookingEntry} scheduledItems={scheduledItems} onAddSchedule={addScheduledItem} onDeleteSchedule={deleteScheduledItem} customRecipes={customRecipes}/>
       </>)}
 
       {!nav&&tab==='fitness'&&(<>
