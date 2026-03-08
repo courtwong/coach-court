@@ -661,7 +661,7 @@ function RestScreen({seconds,restType,nextName,color,onDone}) {
   };
   const pct=Math.min(1,totalRef.current>0?left/totalRef.current:0);
   const r=90,circ=2*Math.PI*r;
-  const urgent=left>0&&left<=10;
+  const urgent=left>0&&left<=5;
   const bg=urgent?'#FF3B30':color;
   return (
     <div className="rest-screen" style={{background:bg,transition:'background 0.6s ease'}}>
@@ -1286,17 +1286,81 @@ function EditWorkoutModal({entry,onSave,onClose,customWorkouts}) {
   );
 }
 
+// ─── SCHEDULE MODAL ───────────────────────────────────────────────────────────
+function ScheduleModal({dateStr,existing,onSave,onDelete,onClose}) {
+  const [type,setType]=useState('workout');
+  const [categoryId,setCategoryId]=useState('lower');
+  const [mealType,setMealType]=useState('dinner');
+  const displayDate=new Date(dateStr+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const save=()=>{
+    if(type==='workout'){const cat=CATEGORIES[categoryId];onSave({id:uid(),date:dateStr,type:'workout',categoryId,label:cat.label,emoji:cat.emoji});}
+    else{const cat=MEAL_CATEGORIES[mealType];onSave({id:uid(),date:dateStr,type:'meal',mealType,label:cat.label,emoji:cat.emoji});}
+  };
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+        <div className="modal-handle"/>
+        <div className="modal-title">📅 {displayDate}</div>
+        {existing.length>0&&(
+          <div style={{marginBottom:20}}>
+            <div style={{fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:1,color:'var(--muted)',marginBottom:10}}>Planned</div>
+            {existing.map(item=>{
+              const itemBg=item.type==='workout'?COLORS[item.categoryId].bg:'#4ECDC4';
+              const itemCol=item.type==='workout'?COLORS[item.categoryId].text:'#fff';
+              return (
+                <div key={item.id} style={{display:'flex',alignItems:'center',gap:10,background:itemBg,borderRadius:14,padding:'10px 14px',marginBottom:8}}>
+                  <div style={{fontSize:18}}>{item.emoji}</div>
+                  <div style={{flex:1,fontWeight:700,fontSize:14,color:itemCol}}>{item.label}</div>
+                  <button style={{background:'rgba(0,0,0,0.15)',border:'none',borderRadius:8,padding:'4px 10px',fontSize:11,fontWeight:700,color:itemCol,cursor:'pointer'}} onClick={()=>onDelete(item.id)}>Remove</button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div style={{fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:1,color:'var(--muted)',marginBottom:12}}>Add to Plan</div>
+        <div style={{display:'flex',gap:8,marginBottom:16}}>
+          <button className={`filter-btn ${type==='workout'?'active':''}`} onClick={()=>setType('workout')}>💪 Workout</button>
+          <button className={`filter-btn ${type==='meal'?'active':''}`} onClick={()=>setType('meal')}>🍳 Meal</button>
+        </div>
+        {type==='workout'&&(
+          <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:20}}>
+            {Object.entries(CATEGORIES).map(([key,cat])=>(
+              <button key={key} style={{background:categoryId===key?COLORS[key].bg:'var(--bg2)',color:categoryId===key?COLORS[key].text:'var(--text)',border:'none',borderRadius:50,padding:'8px 16px',fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}} onClick={()=>setCategoryId(key)}>{cat.emoji} {cat.label}</button>
+            ))}
+          </div>
+        )}
+        {type==='meal'&&(
+          <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:20}}>
+            {Object.entries(MEAL_CATEGORIES).map(([key,cat])=>(
+              <button key={key} style={{background:mealType===key?'#4ECDC4':'var(--bg2)',color:mealType===key?'#fff':'var(--text)',border:'none',borderRadius:50,padding:'8px 16px',fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}} onClick={()=>setMealType(key)}>{cat.emoji} {cat.label}</button>
+            ))}
+          </div>
+        )}
+        <div className="modal-actions">
+          <button className="modal-cancel" onClick={onClose}>Done</button>
+          <button className="modal-save" onClick={save}>+ Add to Plan</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── CALENDAR ─────────────────────────────────────────────────────────────────
-function CalendarView({history,customWorkouts,cookingLog,onDeleteEntry,onEditEntry,onDeleteCookingEntry}) {
+function CalendarView({history,customWorkouts,cookingLog,onDeleteEntry,onEditEntry,onDeleteCookingEntry,scheduledItems,onAddSchedule,onDeleteSchedule}) {
   const today=new Date();const yr=today.getFullYear(),mo=today.getMonth();
+  const todayStr=today.toISOString().split('T')[0];
   const firstDay=new Date(yr,mo,1).getDay();const days=new Date(yr,mo+1,0).getDate();
   const wmap={};history.forEach(w=>{wmap[w.date]=w;});
   const cmap={};(cookingLog||[]).forEach(c=>{if(!cmap[c.date])cmap[c.date]=c;});
+  const smap={};(scheduledItems||[]).forEach(s=>{if(!smap[s.date])smap[s.date]=[];smap[s.date].push(s);});
   const [editEntry,setEditEntry]=useState(null);
+  const [schedModal,setSchedModal]=useState(null);
   const allEntries=[...history.map(e=>({...e,_type:'workout'})),...(cookingLog||[]).map(e=>({...e,_type:'cooking'}))].sort((a,b)=>b.date.localeCompare(a.date)||0);
+  const upcoming=(scheduledItems||[]).filter(s=>s.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date));
   return (<>
     {editEntry&&<EditWorkoutModal entry={editEntry} onSave={(id,mins)=>{onEditEntry(id,mins);setEditEntry(null);}} onClose={()=>setEditEntry(null)} customWorkouts={customWorkouts}/>}
-    <div style={{marginBottom:24}}>
+    {schedModal&&<ScheduleModal dateStr={schedModal} existing={smap[schedModal]||[]} onSave={item=>{onAddSchedule(item);}} onDelete={id=>onDeleteSchedule(id)} onClose={()=>setSchedModal(null)}/>}
+    <div style={{marginBottom:24,marginTop:28}}>
       <div style={{fontSize:32,fontWeight:900,letterSpacing:'-1.5px',marginBottom:4}}>{today.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>
       <div style={{fontSize:14,fontWeight:500,color:'var(--muted)'}}>{history.length} workout{history.length!==1?'s':''} · {(cookingLog||[]).length} recipe{(cookingLog||[]).length!==1?'s':''} cooked</div>
     </div>
@@ -1306,20 +1370,51 @@ function CalendarView({history,customWorkouts,cookingLog,onDeleteEntry,onEditEnt
       {Array.from({length:days}).map((_,i)=>{
         const d=i+1;
         const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-        const wEntry=wmap[ds];const cEntry=cmap[ds];
-        const isToday=d===today.getDate();
-        let bg,col;
+        const wEntry=wmap[ds];const cEntry=cmap[ds];const schedList=smap[ds]||[];
+        const isToday=ds===todayStr;const isFuture=ds>=todayStr;
+        let bg,col,extraStyle={};
         if(wEntry&&cEntry){const wc=COLORS[wEntry.categoryId];bg=`linear-gradient(135deg,${wc.bg} 55%,#4ECDC4 55%)`;col='#fff';}
         else if(wEntry){const wc=COLORS[wEntry.categoryId];bg=wc.bg;col=wc.text;}
         else if(cEntry){bg='#4ECDC4';col='#fff';}
+        else if(schedList.length>0){
+          const sc=schedList[0];const schedColor=sc.type==='workout'?COLORS[sc.categoryId].bg:'#4ECDC4';
+          extraStyle={background:'transparent',color:'var(--text)',border:`2px dashed ${schedColor}`,fontSize:11};
+        }
         const isActive=wEntry||cEntry;
-        return <div key={d} className={`cal-day ${isActive?'worked':''} ${isToday?'today':''}`} style={isActive?{background:bg,color:col}:{}}>{d}</div>;
+        return <div key={d} className={`cal-day ${isActive?'worked':''} ${isToday?'today':''}`}
+          style={{...(isActive?{background:bg,color:col}:{}), ...extraStyle, cursor:isFuture?'pointer':'default'}}
+          onClick={()=>{if(isFuture)setSchedModal(ds);}}
+        >{d}</div>;
       })}
     </div>
     <div className="cal-legend">
       {Object.entries(CATEGORIES).map(([k,v])=><div key={k} className="legend-item"><div className="legend-dot" style={{background:COLORS[k].bg}}/>{v.emoji} {v.label}</div>)}
       <div className="legend-item"><div className="legend-dot" style={{background:'#4ECDC4'}}/> 🍳 Kitchen</div>
+      <div className="legend-item"><div style={{width:12,height:12,borderRadius:4,border:'2px dashed #888',display:'inline-block'}}/> Planned</div>
     </div>
+    {upcoming.length>0&&(<>
+      <div style={{fontSize:20,fontWeight:900,letterSpacing:'-0.5px',marginBottom:14}}>Upcoming</div>
+      <div className="recent-list" style={{marginBottom:24}}>
+        {upcoming.map((item,i)=>{
+          const itemBg=item.type==='workout'?COLORS[item.categoryId].bg:'#4ECDC4';
+          const itemCol=item.type==='workout'?COLORS[item.categoryId].text:'#fff';
+          const isLight=itemCol!=='#fff';
+          const dateLabel=new Date(item.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+          return (
+            <div key={i} className="recent-card" style={{background:itemBg}}>
+              <div className="recent-icon">{item.emoji}</div>
+              <div style={{flex:1}}>
+                <div className="recent-name" style={{color:itemCol}}>{item.label}</div>
+                <div className="recent-meta" style={{color:itemCol}}>{dateLabel}</div>
+              </div>
+              <div style={{display:'flex',gap:5}}>
+                <button className="log-action-btn" style={{background:isLight?'rgba(200,0,0,0.12)':'rgba(255,255,255,0.18)',color:isLight?'#CC0000':itemCol}} onClick={ev=>{ev.stopPropagation();if(confirm('Remove from plan?'))onDeleteSchedule(item.id);}}>Remove</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>)}
     <div style={{fontSize:20,fontWeight:900,letterSpacing:'-0.5px',marginBottom:14}}>Activity Log</div>
     <div className="recent-list">
       {allEntries.slice(0,30).map((entry,i)=>{
@@ -1737,6 +1832,9 @@ function App() {
   const [customRecipes,setCustomRecipes]=useState(()=>{try{return JSON.parse(localStorage.getItem('cc-recipes')||'[]');}catch{return [];}});
   const [recipePhotos,setRecipePhotos]=useState(()=>{try{return JSON.parse(localStorage.getItem('cc-recipe-photos')||'{}');}catch{return {};}});
   const [recipeComments,setRecipeComments]=useState(()=>{try{return JSON.parse(localStorage.getItem('cc-recipe-comments')||'{}');}catch{return {};}});
+  const [scheduledItems,setScheduledItems]=useState(()=>{try{return JSON.parse(localStorage.getItem('cc-scheduled')||'[]');}catch{return [];}});
+  const addScheduledItem=item=>{setScheduledItems(prev=>{const updated=[...prev,item];localStorage.setItem('cc-scheduled',JSON.stringify(updated));return updated;});};
+  const deleteScheduledItem=id=>{setScheduledItems(prev=>{const updated=prev.filter(i=>i.id!==id);localStorage.setItem('cc-scheduled',JSON.stringify(updated));return updated;});};
   const toggleFavorite=(workoutId,categoryId)=>{setFavorites(prev=>{const exists=prev.find(f=>f.id===workoutId);const next=exists?prev.filter(f=>f.id!==workoutId):[...prev,{id:workoutId,categoryId}];localStorage.setItem('cc-favorites',JSON.stringify(next));return next;});};
   const toggleRecipeFavorite=id=>{setRecipeFavorites(prev=>{const next=prev.includes(id)?prev.filter(f=>f!==id):[...prev,id];localStorage.setItem('cc-recipe-favorites',JSON.stringify(next));return next;});};
 
@@ -1898,7 +1996,7 @@ function App() {
             })}
           </div>
         </>)}
-        <CalendarView history={history} customWorkouts={custom} cookingLog={cookingLog} onDeleteEntry={deleteHistoryEntry} onEditEntry={editHistoryEntry} onDeleteCookingEntry={deleteCookingEntry}/>
+        <CalendarView history={history} customWorkouts={custom} cookingLog={cookingLog} onDeleteEntry={deleteHistoryEntry} onEditEntry={editHistoryEntry} onDeleteCookingEntry={deleteCookingEntry} scheduledItems={scheduledItems} onAddSchedule={addScheduledItem} onDeleteSchedule={deleteScheduledItem}/>
       </>)}
 
       {!nav&&tab==='fitness'&&(<>
