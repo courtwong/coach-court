@@ -416,6 +416,70 @@ const MEAL_CATEGORIES = {
   beverage:  { label:'Beverage',  emoji:'☕', color:{ bg:'#D4F54A', text:'#1E2800' } },
 };
 
+const PANTRY_CATEGORIES = [
+  { label:'Protein', items:[
+    {id:'chicken',   label:'Chicken',      emoji:'🍗', keywords:['chicken']},
+    {id:'beef',      label:'Beef',         emoji:'🥩', keywords:['beef','steak','ground beef']},
+    {id:'pork',      label:'Pork / Bacon', emoji:'🥓', keywords:['pork','bacon']},
+    {id:'salmon',    label:'Salmon / Fish',emoji:'🐟', keywords:['salmon','fish','tuna']},
+    {id:'shrimp',    label:'Shrimp',       emoji:'🍤', keywords:['shrimp','prawn']},
+    {id:'eggs',      label:'Eggs',         emoji:'🥚', keywords:['egg','eggs']},
+    {id:'tofu',      label:'Tofu',         emoji:'🫙', keywords:['tofu']},
+    {id:'chickpeas', label:'Chickpeas',    emoji:'🫘', keywords:['chickpea','chickpeas']},
+    {id:'lentils',   label:'Lentils',      emoji:'🟤', keywords:['lentil','lentils']},
+  ]},
+  { label:'Grains & Carbs', items:[
+    {id:'rice',     label:'Rice',    emoji:'🍚', keywords:['rice']},
+    {id:'pasta',    label:'Pasta',   emoji:'🍝', keywords:['pasta','noodle','spaghetti','penne','linguine']},
+    {id:'bread',    label:'Bread',   emoji:'🍞', keywords:['bread','loaf']},
+    {id:'oats',     label:'Oats',    emoji:'🥣', keywords:['oat','oats']},
+    {id:'flour',    label:'Flour',   emoji:'🌾', keywords:['flour']},
+    {id:'quinoa',   label:'Quinoa',  emoji:'🌿', keywords:['quinoa']},
+    {id:'tortilla', label:'Tortilla',emoji:'🫓', keywords:['tortilla','wrap']},
+  ]},
+  { label:'Vegetables', items:[
+    {id:'garlic',     label:'Garlic',      emoji:'🧄', keywords:['garlic']},
+    {id:'onion',      label:'Onion',       emoji:'🧅', keywords:['onion']},
+    {id:'ginger',     label:'Ginger',      emoji:'🫚', keywords:['ginger']},
+    {id:'tomato',     label:'Tomato',      emoji:'🍅', keywords:['tomato']},
+    {id:'zucchini',   label:'Zucchini',    emoji:'🥒', keywords:['zucchini','courgette']},
+    {id:'spinach',    label:'Spinach',     emoji:'🥬', keywords:['spinach']},
+    {id:'potato',     label:'Potato',      emoji:'🥔', keywords:['potato','potatoes']},
+    {id:'broccoli',   label:'Broccoli',    emoji:'🥦', keywords:['broccoli']},
+    {id:'carrot',     label:'Carrot',      emoji:'🥕', keywords:['carrot']},
+    {id:'bell_pepper',label:'Bell Pepper', emoji:'🫑', keywords:['bell pepper','capsicum']},
+    {id:'mushroom',   label:'Mushroom',    emoji:'🍄', keywords:['mushroom']},
+    {id:'avocado',    label:'Avocado',     emoji:'🥑', keywords:['avocado']},
+    {id:'cucumber',   label:'Cucumber',    emoji:'🫛', keywords:['cucumber']},
+  ]},
+  { label:'Dairy & Fats', items:[
+    {id:'butter',     label:'Butter',      emoji:'🧈', keywords:['butter']},
+    {id:'milk',       label:'Milk',        emoji:'🥛', keywords:['milk']},
+    {id:'cheese',     label:'Cheese',      emoji:'🧀', keywords:['cheese','parmesan','mozzarella','cheddar']},
+    {id:'cream',      label:'Cream',       emoji:'🍶', keywords:['cream','heavy cream']},
+    {id:'yogurt',     label:'Yogurt',      emoji:'🥄', keywords:['yogurt','yoghurt']},
+    {id:'olive_oil',  label:'Olive Oil',   emoji:'🫒', keywords:['olive oil']},
+    {id:'neutral_oil',label:'Neutral Oil', emoji:'🛢️', keywords:['neutral oil','vegetable oil','canola','sunflower oil']},
+  ]},
+  { label:'Pantry Staples', items:[
+    {id:'salt',         label:'Salt & Pepper', emoji:'🧂', keywords:['salt','pepper']},
+    {id:'soy_sauce',    label:'Soy Sauce',     emoji:'🍶', keywords:['soy sauce','tamari']},
+    {id:'honey',        label:'Honey',         emoji:'🍯', keywords:['honey']},
+    {id:'lemon',        label:'Lemon / Lime',  emoji:'🍋', keywords:['lemon','lime']},
+    {id:'chili',        label:'Chili / Hot Sauce', emoji:'🌶️', keywords:['chili','chilli','hot sauce','chili crisp','sriracha','chile']},
+    {id:'tomato_paste', label:'Tomato Paste',  emoji:'🥫', keywords:['tomato paste','tomato sauce','crushed tomato']},
+    {id:'coconut_milk', label:'Coconut Milk',  emoji:'🥥', keywords:['coconut milk','coconut cream']},
+    {id:'turmeric',     label:'Turmeric',      emoji:'🟡', keywords:['turmeric']},
+    {id:'cumin',        label:'Cumin',         emoji:'🌿', keywords:['cumin']},
+    {id:'paprika',      label:'Paprika',       emoji:'🟠', keywords:['paprika']},
+    {id:'cilantro',     label:'Cilantro',      emoji:'🌱', keywords:['cilantro','coriander']},
+    {id:'stock',        label:'Stock / Broth', emoji:'🫙', keywords:['stock','broth','bouillon']},
+  ]},
+];
+
+const PANTRY_KEYWORD_MAP = {};
+PANTRY_CATEGORIES.forEach(cat => cat.items.forEach(item => { PANTRY_KEYWORD_MAP[item.id] = item.keywords; }));
+
 // Equipment tags per exercise — extend as needed
 const EXERCISE_EQUIPMENT = {
   'Barbell Hip Thrust':             ['weights','barbell'],
@@ -1698,13 +1762,105 @@ function RecipeFavoritesDetail({onBack,onViewRecipe,customRecipes,recipePhotos,r
 }
 
 // ─── KITCHEN VIEW ─────────────────────────────────────────────────────────────
-function KitchenView({onSelectMealType,onSelectFavorites,customRecipes,recipeFavorites,onBuildRecipe}) {
+function getIngredientMatch(recipe, selectedIds) {
+  const ings = recipe.ingredients || [];
+  if (!ings.length || !selectedIds.length) return {matched:0, total:ings.length};
+  const matched = ings.filter(ing => {
+    const lower = ing.toLowerCase();
+    return selectedIds.some(id => (PANTRY_KEYWORD_MAP[id]||[]).some(kw => lower.includes(kw)));
+  }).length;
+  return {matched, total:ings.length};
+}
+
+function IngredientPickerModal({selected, onToggle, onClose, onClear}) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" style={{maxHeight:'85vh',overflowY:'auto'}} onClick={e=>e.stopPropagation()}>
+        <div className="modal-handle"/>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+          <div className="modal-title" style={{margin:0}}>🥦 What's in your kitchen?</div>
+          {selected.length>0&&<button onClick={onClear} style={{border:'none',background:'none',fontSize:12,fontWeight:700,color:'var(--muted)',cursor:'pointer',padding:'4px 8px',flexShrink:0}}>Clear all</button>}
+        </div>
+        <div style={{fontSize:13,fontWeight:600,color:'var(--muted)',marginBottom:18}}>
+          {selected.length>0?`${selected.length} ingredient${selected.length!==1?'s':''} selected — tap to toggle`:'Tap ingredients you have on hand'}
+        </div>
+        {PANTRY_CATEGORIES.map(cat=>(
+          <div key={cat.label} style={{marginBottom:20}}>
+            <div style={{fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:1,color:'var(--muted)',marginBottom:10}}>{cat.label}</div>
+            <div style={{display:'flex',flexWrap:'wrap',gap:8}}>
+              {cat.items.map(item=>{
+                const on=selected.includes(item.id);
+                return <button key={item.id} onClick={()=>onToggle(item.id)} style={{background:on?'#4ECDC4':'var(--bg2)',color:on?'#fff':'var(--text)',border:'none',borderRadius:50,padding:'8px 14px',fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}}>{item.emoji} {item.label}</button>;
+              })}
+            </div>
+          </div>
+        ))}
+        <div className="modal-actions" style={{marginTop:8}}>
+          <button className="modal-save" style={{flex:1}} onClick={onClose}>✓ Done ({selected.length} selected)</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KitchenView({onSelectMealType,onSelectFavorites,customRecipes,recipeFavorites,onBuildRecipe,onViewRecipe}) {
   const allCustom=customRecipes||[];
+  const [selectedPantry,setSelectedPantry]=useState(()=>{try{return JSON.parse(localStorage.getItem('cc-pantry')||'[]');}catch{return[];}});
+  const [showPantry,setShowPantry]=useState(false);
+  const toggleIngredient=id=>{setSelectedPantry(prev=>{const updated=prev.includes(id)?prev.filter(x=>x!==id):[...prev,id];localStorage.setItem('cc-pantry',JSON.stringify(updated));return updated;});};
+  const clearPantry=()=>{setSelectedPantry([]);localStorage.removeItem('cc-pantry');};
+
+  const allRecipes=[...RECIPES,...allCustom];
+  const mealSuggestions=selectedPantry.length>0
+    ? allRecipes.map(r=>{const {matched,total}=getIngredientMatch(r,selectedPantry);return {...r,_matched:matched,_total:total,_pct:total?Math.round(matched/total*100):0};}).filter(r=>r._matched>0).sort((a,b)=>b._pct-a._pct)
+    : [];
+
   return (<>
+    {showPantry&&<IngredientPickerModal selected={selectedPantry} onToggle={toggleIngredient} onClose={()=>setShowPantry(false)} onClear={clearPantry}/>}
     <div style={{marginBottom:20}}>
       <div style={{fontSize:32,fontWeight:900,letterSpacing:'-1.5px',marginBottom:4}}>Kitchen 🍳</div>
       <div style={{fontSize:14,fontWeight:500,color:'var(--muted)'}}>Your recipes, one step at a time.</div>
     </div>
+
+    {/* Pantry / ingredient picker card */}
+    <div style={{background:selectedPantry.length?'#4ECDC4':'var(--bg2)',borderRadius:16,padding:'14px 18px',marginBottom:20,cursor:'pointer',display:'flex',alignItems:'center',gap:12}} onClick={()=>setShowPantry(true)}>
+      <div style={{fontSize:26}}>🥦</div>
+      <div style={{flex:1}}>
+        <div style={{fontSize:15,fontWeight:800,color:selectedPantry.length?'#fff':'var(--text)'}}>What's in your kitchen?</div>
+        <div style={{fontSize:12,fontWeight:600,color:selectedPantry.length?'rgba(255,255,255,0.8)':'var(--muted)'}}>
+          {selectedPantry.length?`${selectedPantry.length} ingredient${selectedPantry.length!==1?'s':''} selected`:'Tap to pick your ingredients & find meal ideas'}
+        </div>
+      </div>
+      <div style={{fontSize:13,fontWeight:800,color:selectedPantry.length?'rgba(255,255,255,0.9)':'var(--muted)'}}>{selectedPantry.length?'Edit ›':'›'}</div>
+    </div>
+
+    {/* Meal suggestions */}
+    {mealSuggestions.length>0&&(
+      <div style={{marginBottom:24}}>
+        <div className="section-title">Meal Ideas ({mealSuggestions.length})</div>
+        {mealSuggestions.map(r=>{
+          const pctColor=r._pct===100?'#00C853':r._pct>=60?'#FFB300':'#FF7043';
+          const badge=r._pct===100?'Ready to cook! 🟢':r._pct>=60?'Almost there 🟡':'Missing a few 🟠';
+          return (
+            <div key={r.id} style={{background:'var(--bg2)',borderRadius:16,padding:'14px 16px',marginBottom:10,display:'flex',alignItems:'center',gap:12,cursor:'pointer'}} onClick={()=>onViewRecipe&&onViewRecipe(r.id,r.mealType||'dinner')}>
+              <div style={{fontSize:28}}>{r.emoji}</div>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontWeight:800,fontSize:14,marginBottom:3}}>{r.label}</div>
+                <div style={{fontSize:11,fontWeight:600,color:'var(--muted)'}}>{MEAL_CATEGORIES[r.mealType||'dinner']?.emoji} {MEAL_CATEGORIES[r.mealType||'dinner']?.label} · {badge}</div>
+              </div>
+              <div style={{textAlign:'right',flexShrink:0}}>
+                <div style={{fontSize:16,fontWeight:900,color:pctColor}}>{r._pct}%</div>
+                <div style={{fontSize:10,fontWeight:600,color:'var(--muted)'}}>{r._matched}/{r._total} ingr.</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+    {selectedPantry.length>0&&mealSuggestions.length===0&&(
+      <div style={{textAlign:'center',padding:'20px 0 24px',color:'var(--muted)',fontSize:14,fontWeight:600}}>No matching recipes yet. Try adding more ingredients or a custom recipe.</div>
+    )}
+
     <div className="category-list">
       {(recipeFavorites||[]).length>0&&(
         <div className="category-card" style={{background:'#FFD700'}} onClick={onSelectFavorites}>
@@ -2070,7 +2226,7 @@ function App() {
         </>)}
       </>)}
 
-      {!nav&&tab==='kitchen'&&<KitchenView onSelectMealType={key=>setNav({type:'mealCategory',mealType:key})} onSelectFavorites={()=>setNav({type:'recipeFavorites'})} customRecipes={customRecipes} recipeFavorites={recipeFavorites} onBuildRecipe={()=>setShowRecipeBuilder(true)}/>}
+      {!nav&&tab==='kitchen'&&<KitchenView onSelectMealType={key=>setNav({type:'mealCategory',mealType:key})} onSelectFavorites={()=>setNav({type:'recipeFavorites'})} customRecipes={customRecipes} recipeFavorites={recipeFavorites} onBuildRecipe={()=>setShowRecipeBuilder(true)} onViewRecipe={(id,mealType)=>setNav({type:'recipeDetail',recipeId:id,fromMealType:mealType})}/>}
       {!nav&&tab==='profile'&&<ProfileView history={history} profile={profile} userEmail={userEmail} onEdit={()=>setShowEdit(true)} onSignOut={signOut}/>}
     </div>
 
