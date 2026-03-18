@@ -703,8 +703,8 @@ function AuthScreen() {
 }
 
 // ─── REST ─────────────────────────────────────────────────────────────────────
-function RestScreen({seconds,restType,nextName,color,onDone}) {
-  const endTimeRef=useRef(Date.now()+seconds*1000);
+function RestScreen({seconds,endTime,restType,nextName,color,onDone}) {
+  const endTimeRef=useRef(endTime??Date.now()+seconds*1000);
   const totalRef=useRef(seconds);
   const [left,setLeft]=useState(seconds);
   useEffect(()=>{
@@ -862,16 +862,22 @@ function CookingFlow({recipeId,onFinish,onBack,customRecipes}) {
 }
 
 // ─── WORKOUT FLOW ─────────────────────────────────────────────────────────────
+const WF_KEY='cc-active-workout';
 function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdateWeight,customWorkouts}) {
   const col=COLORS[categoryId];
   const workout=getWorkout(categoryId,workoutId,customWorkouts);
   const steps=workout.steps;
   const seq=buildSeq(steps);
-  const [si,setSi]=useState(0);
-  const [phase,setPhase]=useState('exercise');
-  const [restInfo,setRestInfo]=useState({});
-  const [weights,setWeights]=useState(()=>{const w={};steps.forEach(s=>sNames(s).forEach(n=>{w[n]=weightHistory[n]||0;}));return w;});
-  const startTime=useRef(Date.now());
+  const saved=(()=>{try{const s=localStorage.getItem(WF_KEY);if(!s)return null;const p=JSON.parse(s);return p.categoryId===categoryId&&p.workoutId===workoutId?p:null;}catch(e){return null;}})();
+  const [si,setSi]=useState(()=>saved?.si??0);
+  const [phase,setPhase]=useState(()=>saved?.phase??'exercise');
+  const [restInfo,setRestInfo]=useState(()=>saved?.restInfo??{});
+  const [weights,setWeights]=useState(()=>saved?.weights||(()=>{const w={};steps.forEach(s=>sNames(s).forEach(n=>{w[n]=weightHistory[n]||0;}));return w;})());
+  const startTime=useRef(saved?.startTime??Date.now());
+  useEffect(()=>{
+    if(phase==='done'){localStorage.removeItem(WF_KEY);return;}
+    try{localStorage.setItem(WF_KEY,JSON.stringify({categoryId,workoutId,si,phase,restInfo,weights,startTime:startTime.current}));}catch(e){}
+  },[si,phase,restInfo,weights]);
   useEffect(()=>{
     let wakeLock=null;
     const requestWL=async()=>{try{if('wakeLock' in navigator)wakeLock=await navigator.wakeLock.request('screen');}catch(e){}};
@@ -889,9 +895,11 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
     sNames(curStep).forEach(n=>onUpdateWeight(n,weights[n]));
     if(isLastSeq){setPhase('done');return;}
     const ns=seq[si+1];const nstep=steps[ns.stepIdx];
-    setRestInfo({seconds:isLastSet?120:90,type:isLastSet?'between-exercises':'between-sets',nextName:sLabel(nstep)+(ns.setIdx===0?'':` — Set ${ns.setIdx+1}`)});
+    const restSecs=isLastSet?120:90;
+    setRestInfo({seconds:restSecs,endTime:Date.now()+restSecs*1000,type:isLastSet?'between-exercises':'between-sets',nextName:sLabel(nstep)+(ns.setIdx===0?'':` — Set ${ns.setIdx+1}`)});
     setPhase('rest');
   };
+  const handleBack=()=>{localStorage.removeItem(WF_KEY);onBack();};
   if(phase==='done'){
     const mins=Math.max(1,Math.round((Date.now()-startTime.current)/60000));
     return (
@@ -908,14 +916,14 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
       </div>
     );
   }
-  if(phase==='rest') return <RestScreen seconds={restInfo.seconds} restType={restInfo.type} nextName={restInfo.nextName} color={accentColor} onDone={()=>{setPhase('exercise');setSi(i=>i+1);}}/>;
+  if(phase==='rest') return <RestScreen seconds={restInfo.seconds} endTime={restInfo.endTime} restType={restInfo.type} nextName={restInfo.nextName} color={accentColor} onDone={()=>{setPhase('exercise');setSi(i=>i+1);}}/>;
   const pct=(si/seq.length)*100;
   const upcoming=[];let last=cur.stepIdx;
   for(let i=si+1;i<seq.length;i++){const s=seq[i];if(s.stepIdx!==last){upcoming.push(steps[s.stepIdx]);last=s.stepIdx;if(upcoming.length>=3)break;}}
   return (
     <div className="ex-screen">
       <div className="ex-header">
-        <button className="back-btn" onClick={onBack}>←</button>
+        <button className="back-btn" onClick={handleBack}>←</button>
         <div className="ex-wname">{workout.emoji} {workout.label}</div>
         <div className="ex-prog-text">{cur.stepIdx+1} / {steps.length}</div>
       </div>
