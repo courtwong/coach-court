@@ -702,6 +702,59 @@ function AuthScreen() {
   );
 }
 
+// ─── SET NEW PASSWORD ─────────────────────────────────────────────────────────
+function SetNewPasswordScreen({onDone}) {
+  const [password,setPassword]=useState('');
+  const [confirm,setConfirm]=useState('');
+  const [showPw,setShowPw]=useState(false);
+  const [loading,setLoading]=useState(false);
+  const [err,setErr]=useState('');
+  const handleSubmit=async()=>{
+    setErr('');
+    if(password.length<6){setErr('Password must be at least 6 characters.');return;}
+    if(password!==confirm){setErr('Passwords do not match.');return;}
+    setLoading(true);
+    const{error:e}=await sb.auth.updateUser({password});
+    setLoading(false);
+    if(e){setErr(e.message);return;}
+    onDone();
+  };
+  return (
+    <div className="auth-screen">
+      <div className="auth-hero">
+        <div className="auth-wordmark">Coach <span>Court</span></div>
+        <div className="auth-hero-sub">Almost there — set your new password.</div>
+      </div>
+      <div className="auth-body">
+        <div style={{textAlign:'center',marginBottom:16}}>
+          <div style={{fontSize:20,fontWeight:900,letterSpacing:'-0.5px',marginBottom:4}}>New Password</div>
+          <div style={{fontSize:13,color:'var(--muted)',fontWeight:500}}>Enter and confirm your new password</div>
+        </div>
+        {err&&<div className="auth-error">{err}</div>}
+        <div>
+          <label className="auth-label">New Password</label>
+          <div style={{position:'relative'}}>
+            <input className="auth-input" type={showPw?'text':'password'} placeholder="Min 6 characters"
+              value={password} onChange={e=>setPassword(e.target.value)} style={{paddingRight:52}}/>
+            <button onClick={()=>setShowPw(v=>!v)} style={{position:'absolute',right:14,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',color:'var(--muted)',fontSize:14,fontWeight:700,padding:0}}>
+              {showPw?'Hide':'Show'}
+            </button>
+          </div>
+        </div>
+        <div>
+          <label className="auth-label">Confirm Password</label>
+          <input className="auth-input" type={showPw?'text':'password'} placeholder="Re-enter password"
+            value={confirm} onChange={e=>setConfirm(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&handleSubmit()}/>
+        </div>
+        <button className="auth-main-btn" onClick={handleSubmit} disabled={loading}>
+          {loading?'…':'Set New Password →'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── REST ─────────────────────────────────────────────────────────────────────
 function RestScreen({seconds,restType,nextName,color,onDone}) {
   const endTimeRef=useRef(Date.now()+seconds*1000);
@@ -749,9 +802,20 @@ function RestScreen({seconds,restType,nextName,color,onDone}) {
 
 // ─── COOKING TIMER ────────────────────────────────────────────────────────────
 function CookingTimer({seconds,stepLabel,onDone}) {
-  const [left,setLeft]=useState(seconds);
+  const endTimeRef=useRef(Date.now()+seconds*1000);
   const total=useRef(seconds);
-  useEffect(()=>{ if(left<=0){onDone();return;} const t=setTimeout(()=>setLeft(l=>l-1),1000); return()=>clearTimeout(t); },[left]);
+  const [left,setLeft]=useState(seconds);
+  useEffect(()=>{
+    let id;
+    const tick=()=>{
+      const rem=Math.max(0,Math.round((endTimeRef.current-Date.now())/1000));
+      setLeft(rem);
+      if(rem<=0){clearInterval(id);onDone();return;}
+    };
+    tick();
+    id=setInterval(tick,500);
+    return()=>clearInterval(id);
+  },[]);
   const pct=left/total.current,r=90,circ=2*Math.PI*r;
   return (
     <div className="rest-screen" style={{background:'#1A8080'}}>
@@ -2029,6 +2093,7 @@ function ProfileView({history,profile,userEmail,onEdit,onSignOut}) {
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 function App() {
   const [session,setSession]=useState(undefined);
+  const [resetMode,setResetMode]=useState(false);
   const [tab,setTab]=useState('home');
   const [nav,setNav]=useState(null);
   const [dataLoading,setDataLoading]=useState(false);
@@ -2052,10 +2117,13 @@ function App() {
 
   useEffect(()=>{
     sb.auth.getSession().then(({data:{session}})=>setSession(session));
-    const {data:{subscription}}=sb.auth.onAuthStateChange((_,session)=>setSession(session));
+    const {data:{subscription}}=sb.auth.onAuthStateChange((event,session)=>{
+      if(event==='PASSWORD_RECOVERY')setResetMode(true);
+      setSession(session);
+    });
     const handleVisibility=()=>{ if(document.visibilityState==="visible"){ sb.auth.getSession().then(({data:{session}})=>{ if(session) setSession(session); }); } };
     document.addEventListener("visibilitychange",handleVisibility);
-    const handleHash=()=>{ if(window.location.hash&&window.location.hash.includes("access_token")){ sb.auth.getSession().then(({data:{session}})=>{ if(session) setSession(session); }); } };
+    const handleHash=()=>{ if(window.location.hash&&window.location.hash.includes("access_token")){ if(window.location.hash.includes("type=recovery"))setResetMode(true); sb.auth.getSession().then(({data:{session}})=>{ if(session) setSession(session); }); } };
     window.addEventListener("hashchange",handleHash);
     handleHash();
     return()=>{ subscription.unsubscribe(); document.removeEventListener("visibilitychange",handleVisibility); window.removeEventListener("hashchange",handleHash); };
@@ -2077,7 +2145,8 @@ function App() {
       }catch(e){setError('Could not load data.');}
       finally{setDataLoading(false);}
     })();
-  },[session]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[session?.user?.id]);
 
   const history=data.history||[];const wh=data.weightHistory||{};const profile=data.profile||{name:'Athlete',since:'—',photo:null};const custom=data.customWorkouts||[];
   const userEmail=session?.user?.email||null;
@@ -2130,6 +2199,7 @@ function App() {
   const recentAll=[...history.map(e=>({...e,_type:'workout'})),...cookingLog.map(e=>({...e,_type:'cooking'}))].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,4);
 
   if(session===undefined) return <div className="loading-screen"><div className="loading-wordmark">Coach <span>Court</span></div><div className="spinner"/></div>;
+  if(resetMode) return <SetNewPasswordScreen onDone={()=>{setResetMode(false);setNav(null);setTab('home');}}/>;
   if(!session) return <AuthScreen/>;
   if(dataLoading) return <div className="loading-screen"><div className="loading-wordmark">Coach <span>Court</span></div><div className="spinner"/><div style={{fontSize:13,fontWeight:600,color:'var(--muted)'}}>Loading…</div></div>;
   if(nav?.type==='workout') return <WorkoutFlow categoryId={nav.categoryId} workoutId={nav.workoutId} onFinish={finishWorkout} onBack={()=>setNav({type:'category',categoryId:nav.categoryId})} weightHistory={wh} onUpdateWeight={updateWeight} customWorkouts={custom}/>;
