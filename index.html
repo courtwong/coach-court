@@ -929,12 +929,13 @@ function CookingFlow({recipeId,onFinish,onBack,customRecipes}) {
 function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdateWeight,customWorkouts}) {
   const col=COLORS[categoryId];
   const workout=getWorkout(categoryId,workoutId,customWorkouts);
-  const steps=workout.steps;
+  const [steps,setSteps]=useState(workout.steps);
   const seq=buildSeq(steps);
   const [si,setSi]=useState(0);
   const [phase,setPhase]=useState('exercise');
   const [restInfo,setRestInfo]=useState({});
-  const [weights,setWeights]=useState(()=>{const w={};steps.forEach(s=>sNames(s).forEach(n=>{w[n]=weightHistory[n]||0;}));return w;});
+  const [weights,setWeights]=useState(()=>{const w={};workout.steps.forEach(s=>sNames(s).forEach(n=>{w[n]=weightHistory[n]||0;}));return w;});
+  const [showReorder,setShowReorder]=useState(false);
   const startTime=useRef(Date.now());
   useEffect(()=>{
     let wakeLock=null;
@@ -946,9 +947,15 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
   },[]);
   const cur=seq[si]||seq[seq.length-1];
   const curStep=steps[cur.stepIdx];
+  const curStepIdx=cur.stepIdx;
   const isLastSeq=si>=seq.length-1;
   const isLastSet=cur.setIdx>=curStep.sets-1;
   const accentColor=col.bg==='#D4F54A'?'#8FB800':col.bg==='#C4A8FF'?'#7C4DFF':col.bg;
+  const moveUpcoming=(idx,dir)=>{
+    const target=idx+dir;
+    if(target<=curStepIdx||target>=steps.length||idx<=curStepIdx)return;
+    setSteps(s=>{const a=[...s];[a[idx],a[target]]=[a[target],a[idx]];return a;});
+  };
   const handleLog=()=>{
     sNames(curStep).forEach(n=>onUpdateWeight(n,weights[n]));
     if(isLastSeq){setPhase('done');return;}
@@ -974,14 +981,41 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
   }
   if(phase==='rest') return <RestScreen seconds={restInfo.seconds} restType={restInfo.type} nextName={restInfo.nextName} color={accentColor} onDone={()=>{setPhase('exercise');setSi(i=>i+1);}}/>;
   const pct=(si/seq.length)*100;
-  const upcoming=[];let last=cur.stepIdx;
-  for(let i=si+1;i<seq.length;i++){const s=seq[i];if(s.stepIdx!==last){upcoming.push(steps[s.stepIdx]);last=s.stepIdx;if(upcoming.length>=3)break;}}
+  const upcoming=[];let last=curStepIdx;
+  for(let i=si+1;i<seq.length;i++){const s=seq[i];if(s.stepIdx!==last){upcoming.push({step:steps[s.stepIdx],stepIdx:s.stepIdx});last=s.stepIdx;if(upcoming.length>=3)break;}}
+  const futureSteps=steps.slice(curStepIdx+1);
   return (
     <div className="ex-screen">
+      {showReorder&&(
+        <div className="modal-overlay" onClick={()=>setShowReorder(false)}>
+          <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+            <div className="modal-handle"/>
+            <div className="modal-title">Reorder Exercises</div>
+            {steps.map((step,i)=>{
+              const isDoneOrCurrent=i<=curStepIdx;
+              const canUp=i>curStepIdx+1;
+              const canDown=i>curStepIdx&&i<steps.length-1;
+              return (
+                <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderBottom:'1px solid var(--border)',opacity:isDoneOrCurrent?0.4:1}}>
+                  <div style={{width:24,height:24,borderRadius:8,background:isDoneOrCurrent?'var(--border)':accentColor,color:isDoneOrCurrent?'var(--muted)':'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,flexShrink:0}}>{i+1}</div>
+                  <div style={{flex:1,fontSize:14,fontWeight:700,color:'var(--text)'}}>{sLabel(step)}<span style={{fontSize:11,fontWeight:500,color:'var(--muted)',marginLeft:6}}>{step.sets}×{Array.isArray(step.reps)?step.reps[0]:step.reps}</span>{i===curStepIdx&&<span style={{marginLeft:8,fontSize:10,fontWeight:800,color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>Now</span>}</div>
+                  {!isDoneOrCurrent&&(
+                    <div style={{display:'flex',gap:4}}>
+                      <button onClick={()=>moveUpcoming(i,-1)} disabled={!canUp} style={{background:'var(--bg2)',border:'none',borderRadius:8,width:32,height:32,fontSize:16,cursor:canUp?'pointer':'default',opacity:canUp?1:0.25,fontFamily:'Inter,sans-serif'}}>↑</button>
+                      <button onClick={()=>moveUpcoming(i,1)} disabled={!canDown} style={{background:'var(--bg2)',border:'none',borderRadius:8,width:32,height:32,fontSize:16,cursor:canDown?'pointer':'default',opacity:canDown?1:0.25,fontFamily:'Inter,sans-serif'}}>↓</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            <div className="modal-actions"><button className="modal-save" style={{width:'100%'}} onClick={()=>setShowReorder(false)}>Done</button></div>
+          </div>
+        </div>
+      )}
       <div className="ex-header">
         <button className="back-btn" onClick={onBack}>←</button>
         <div className="ex-wname">{workout.emoji} {workout.label}</div>
-        <div className="ex-prog-text">{cur.stepIdx+1} / {steps.length}</div>
+        <div className="ex-prog-text">{curStepIdx+1} / {steps.length}</div>
       </div>
       <div className="prog-track"><div className="prog-fill" style={{width:`${pct}%`,background:accentColor}}/></div>
       <div className="ex-body">
@@ -1023,9 +1057,12 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
         </button>
       </div>
       <div className="ex-footer">
-        <div className="upcoming-title">Coming Up</div>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+          <div className="upcoming-title" style={{marginBottom:0}}>Coming Up</div>
+          {futureSteps.length>0&&<button onClick={()=>setShowReorder(true)} style={{background:'var(--bg2)',border:'none',borderRadius:8,padding:'4px 10px',fontSize:11,fontWeight:700,color:'var(--muted)',cursor:'pointer',fontFamily:'Inter,sans-serif'}}>Reorder</button>}
+        </div>
         {!isLastSet&&<div className="upcoming-row"><div className="up-dot" style={{background:accentColor}}/><div className="up-name">{sLabel(curStep)}</div><div className="up-meta">Set {cur.setIdx+2}/{curStep.sets}</div></div>}
-        {upcoming.map((s,i)=><div key={i} className="upcoming-row" style={{opacity:1-i*0.2}}><div className="up-dot"/><div className="up-name">{sLabel(s)}</div><div className="up-meta">{s.sets}×{Array.isArray(s.reps)?s.reps[0]:s.reps}</div></div>)}
+        {upcoming.map(({step,stepIdx},i)=><div key={stepIdx} className="upcoming-row" style={{opacity:1-i*0.2}}><div className="up-dot"/><div className="up-name">{sLabel(step)}</div><div className="up-meta">{step.sets}×{Array.isArray(step.reps)?step.reps[0]:step.reps}</div></div>)}
         {isLastSet&&upcoming.length===0&&<div style={{fontSize:13,fontWeight:700,color:'var(--muted)',fontStyle:'italic'}}>Last one — finish strong! 💪</div>}
       </div>
     </div>
