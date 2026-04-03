@@ -929,13 +929,20 @@ function CookingFlow({recipeId,onFinish,onBack,customRecipes}) {
 function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdateWeight,customWorkouts}) {
   const col=COLORS[categoryId];
   const workout=getWorkout(categoryId,workoutId,customWorkouts);
-  const steps=workout.steps;
+  const [steps,setSteps]=useState(workout.steps);
   const seq=buildSeq(steps);
   const [si,setSi]=useState(0);
   const [phase,setPhase]=useState('exercise');
   const [restInfo,setRestInfo]=useState({});
-  const [weights,setWeights]=useState(()=>{const w={};steps.forEach(s=>sNames(s).forEach(n=>{w[n]=weightHistory[n]||0;}));return w;});
+  const [weights,setWeights]=useState(()=>{const w={};workout.steps.forEach(s=>sNames(s).forEach(n=>{w[n]=weightHistory[n]||0;}));return w;});
+  // reorder modal state
+  const [modalSteps,setModalSteps]=useState(null); // non-null = modal open
+  const [dragFrom,setDragFrom]=useState(-1);
+  const [dragTo,setDragTo]=useState(-1);
+  const listRef=useRef(null);
+  const curStepIdxRef=useRef(0);
   const startTime=useRef(Date.now());
+
   useEffect(()=>{
     let wakeLock=null;
     const requestWL=async()=>{try{if('wakeLock' in navigator)wakeLock=await navigator.wakeLock.request('screen');}catch(e){}};
@@ -944,11 +951,70 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
     document.addEventListener('visibilitychange',onVis);
     return()=>{wakeLock?.release();document.removeEventListener('visibilitychange',onVis);};
   },[]);
+
+  // Drag event listeners — attached only while a drag is active
+  useEffect(()=>{
+    if(dragFrom<0)return;
+    const onMove=e=>{
+      const y=e.touches?e.touches[0].clientY:e.clientY;
+      if(!listRef.current)return;
+      const rows=listRef.current.querySelectorAll('[data-dragidx]');
+      let best=dragFrom;
+      rows.forEach(el=>{
+        const idx=parseInt(el.dataset.dragidx);
+        if(idx<curStepIdxRef.current)return;
+        const r=el.getBoundingClientRect();
+        if(y>r.top+r.height/2)best=idx;
+      });
+      setDragTo(best);
+      e.preventDefault();
+    };
+    const onEnd=()=>{
+      if(dragFrom>=0&&dragTo>=0&&dragFrom!==dragTo){
+        setModalSteps(s=>{
+          const a=[...s];const[item]=a.splice(dragFrom,1);a.splice(dragTo,0,item);return a;
+        });
+      }
+      setDragFrom(-1);setDragTo(-1);
+    };
+    document.addEventListener('touchmove',onMove,{passive:false});
+    document.addEventListener('touchend',onEnd);
+    document.addEventListener('mousemove',onMove);
+    document.addEventListener('mouseup',onEnd);
+    return()=>{
+      document.removeEventListener('touchmove',onMove);
+      document.removeEventListener('touchend',onEnd);
+      document.removeEventListener('mousemove',onMove);
+      document.removeEventListener('mouseup',onEnd);
+    };
+  },[dragFrom,dragTo]);
+
   const cur=seq[si]||seq[seq.length-1];
   const curStep=steps[cur.stepIdx];
+  const curStepIdx=cur.stepIdx;
+  curStepIdxRef.current=curStepIdx;
   const isLastSeq=si>=seq.length-1;
   const isLastSet=cur.setIdx>=curStep.sets-1;
   const accentColor=col.bg==='#D4F54A'?'#8FB800':col.bg==='#C4A8FF'?'#7C4DFF':col.bg;
+
+  const openReorder=()=>setModalSteps([...steps]);
+  const cancelReorder=()=>{setModalSteps(null);setDragFrom(-1);setDragTo(-1);};
+  const doneReorder=()=>{
+    const curExercise=steps[curStepIdx];
+    const newIdx=modalSteps.indexOf(curExercise);
+    const newSeq=buildSeq(modalSteps);
+    const newSi=newSeq.findIndex(s=>s.stepIdx===newIdx&&s.setIdx===cur.setIdx);
+    setSteps(modalSteps);
+    if(newSi>=0)setSi(newSi);
+    setModalSteps(null);setDragFrom(-1);setDragTo(-1);
+  };
+
+  const startDrag=(e,idx)=>{
+    if(idx<curStepIdx)return;
+    e.preventDefault();
+    setDragFrom(idx);setDragTo(idx);
+  };
+
   const handleLog=()=>{
     sNames(curStep).forEach(n=>onUpdateWeight(n,weights[n]));
     if(isLastSeq){setPhase('done');return;}
@@ -956,6 +1022,7 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
     setRestInfo({seconds:isLastSet?120:90,type:isLastSet?'between-exercises':'between-sets',nextName:sLabel(nstep)+(ns.setIdx===0?'':` — Set ${ns.setIdx+1}`)});
     setPhase('rest');
   };
+
   if(phase==='done'){
     const mins=Math.max(1,Math.round((Date.now()-startTime.current)/60000));
     return (
@@ -973,15 +1040,60 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
     );
   }
   if(phase==='rest') return <RestScreen seconds={restInfo.seconds} restType={restInfo.type} nextName={restInfo.nextName} color={accentColor} onDone={()=>{setPhase('exercise');setSi(i=>i+1);}}/>;
+
+  // Live drag preview: show items in their dragged position
+  const displaySteps=modalSteps?[...modalSteps]:[];
+  if(dragFrom>=0&&dragTo>=0&&dragFrom!==dragTo){
+    const[item]=displaySteps.splice(dragFrom,1);displaySteps.splice(dragTo,0,item);
+  }
+
   const pct=(si/seq.length)*100;
-  const upcoming=[];let last=cur.stepIdx;
-  for(let i=si+1;i<seq.length;i++){const s=seq[i];if(s.stepIdx!==last){upcoming.push(steps[s.stepIdx]);last=s.stepIdx;if(upcoming.length>=3)break;}}
+  const upcoming=[];let last=curStepIdx;
+  for(let i=si+1;i<seq.length;i++){const s=seq[i];if(s.stepIdx!==last){upcoming.push({step:steps[s.stepIdx],stepIdx:s.stepIdx});last=s.stepIdx;if(upcoming.length>=3)break;}}
+  const hasFuture=steps.length>curStepIdx+1;
+
   return (
     <div className="ex-screen">
+      {modalSteps&&(
+        <div className="modal-overlay" onClick={cancelReorder}>
+          <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+            <div className="modal-handle"/>
+            <div className="modal-title">Reorder Exercises</div>
+            <div style={{fontSize:12,color:'var(--muted)',fontWeight:500,textAlign:'center',marginBottom:16,marginTop:-8}}>Hold and drag the handle to reorder upcoming exercises</div>
+            <div ref={listRef}>
+              {displaySteps.map((step,displayIdx)=>{
+                const origIdx=steps.indexOf(step);
+                const isDoneOrCurrent=origIdx<curStepIdx;
+                const isDragging=dragFrom>=0&&origIdx===steps.indexOf(modalSteps[dragFrom]);
+                return (
+                  <div key={origIdx} data-dragidx={displayIdx}
+                    style={{display:'flex',alignItems:'center',gap:12,padding:'12px 4px',borderBottom:'1px solid var(--border)',opacity:isDoneOrCurrent?0.35:1,background:isDragging?'var(--bg2)':'transparent',borderRadius:isDragging?12:0,transition:'background 0.1s'}}>
+                    {/* Drag handle */}
+                    <div
+                      onTouchStart={isDoneOrCurrent?undefined:e=>startDrag(e,displayIdx)}
+                      onMouseDown={isDoneOrCurrent?undefined:e=>startDrag(e,displayIdx)}
+                      style={{fontSize:18,color:isDoneOrCurrent?'var(--border)':'var(--muted)',cursor:isDoneOrCurrent?'default':'grab',padding:'0 4px',userSelect:'none',touchAction:'none',flexShrink:0}}>⠿</div>
+                    {/* Number badge */}
+                    <div style={{width:24,height:24,borderRadius:8,background:isDoneOrCurrent?'var(--border)':accentColor,color:isDoneOrCurrent?'var(--muted)':'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,flexShrink:0}}>{displayIdx+1}</div>
+                    {/* Name */}
+                    <div style={{flex:1,fontSize:14,fontWeight:700,color:'var(--text)'}}>
+                      {sLabel(step)}
+                      <span style={{fontSize:11,fontWeight:500,color:'var(--muted)',marginLeft:6}}>{step.sets}×{Array.isArray(step.reps)?step.reps[0]:step.reps}</span>
+                      {origIdx===curStepIdx&&<span style={{marginLeft:8,fontSize:10,fontWeight:800,color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>Now</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <button className="modal-save" style={{width:'100%',marginTop:20}} onClick={doneReorder}>Done</button>
+            <button className="modal-cancel" style={{width:'100%',marginTop:8,textAlign:'center'}} onClick={cancelReorder}>Cancel</button>
+          </div>
+        </div>
+      )}
       <div className="ex-header">
         <button className="back-btn" onClick={onBack}>←</button>
         <div className="ex-wname">{workout.emoji} {workout.label}</div>
-        <div className="ex-prog-text">{cur.stepIdx+1} / {steps.length}</div>
+        <div className="ex-prog-text">{curStepIdx+1} / {steps.length}</div>
       </div>
       <div className="prog-track"><div className="prog-fill" style={{width:`${pct}%`,background:accentColor}}/></div>
       <div className="ex-body">
@@ -1023,9 +1135,12 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
         </button>
       </div>
       <div className="ex-footer">
-        <div className="upcoming-title">Coming Up</div>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+          <div className="upcoming-title" style={{marginBottom:0}}>Coming Up</div>
+          {hasFuture&&<button onClick={openReorder} style={{background:accentColor,border:'none',borderRadius:10,padding:'6px 14px',fontSize:12,fontWeight:800,color:'#fff',cursor:'pointer',fontFamily:'Inter,sans-serif',letterSpacing:'0.2px'}}>Reorder ⠿</button>}
+        </div>
         {!isLastSet&&<div className="upcoming-row"><div className="up-dot" style={{background:accentColor}}/><div className="up-name">{sLabel(curStep)}</div><div className="up-meta">Set {cur.setIdx+2}/{curStep.sets}</div></div>}
-        {upcoming.map((s,i)=><div key={i} className="upcoming-row" style={{opacity:1-i*0.2}}><div className="up-dot"/><div className="up-name">{sLabel(s)}</div><div className="up-meta">{s.sets}×{Array.isArray(s.reps)?s.reps[0]:s.reps}</div></div>)}
+        {upcoming.map(({step,stepIdx},i)=><div key={stepIdx} className="upcoming-row" style={{opacity:1-i*0.2}}><div className="up-dot"/><div className="up-name">{sLabel(step)}</div><div className="up-meta">{step.sets}×{Array.isArray(step.reps)?step.reps[0]:step.reps}</div></div>)}
         {isLastSet&&upcoming.length===0&&<div style={{fontSize:13,fontWeight:700,color:'var(--muted)',fontStyle:'italic'}}>Last one — finish strong! 💪</div>}
       </div>
     </div>
@@ -1041,6 +1156,7 @@ function WorkoutBuilder({onSave,onClose}) {
   const [steps,setSteps]=useState([{id:uid(),type:'single',name:'',sets:'3',reps:'',name2:'',reps2:''}]);
   const addStep=()=>setSteps(s=>[...s,{id:uid(),type:'single',name:'',sets:'3',reps:'',name2:'',reps2:''}]);
   const removeStep=id=>setSteps(s=>s.filter(x=>x.id!==id));
+  const moveStep=(id,dir)=>setSteps(s=>{const idx=s.findIndex(x=>x.id===id);const n=idx+dir;if(n<0||n>=s.length)return s;const a=[...s];[a[idx],a[n]]=[a[n],a[idx]];return a;});
   const upd=(id,f,v)=>setSteps(s=>s.map(x=>x.id===id?{...x,[f]:v}:x));
   const save=()=>{
     if(!name.trim())return alert('Enter a workout name.');
@@ -1067,7 +1183,11 @@ function WorkoutBuilder({onSave,onClose}) {
                 <button className={`type-btn ${step.type==='single'?'active':''}`} onClick={()=>upd(step.id,'type','single')}>Single</button>
                 <button className={`type-btn ${step.type==='superset'?'active':''}`} onClick={()=>upd(step.id,'type','superset')}>Superset</button>
               </div>
-              <button className="remove-btn" onClick={()=>removeStep(step.id)}>✕</button>
+              <div style={{display:'flex',gap:4}}>
+                <button className="remove-btn" style={{opacity:i===0?0.3:1}} disabled={i===0} onClick={()=>moveStep(step.id,-1)}>↑</button>
+                <button className="remove-btn" style={{opacity:i===steps.length-1?0.3:1}} disabled={i===steps.length-1} onClick={()=>moveStep(step.id,1)}>↓</button>
+                <button className="remove-btn" onClick={()=>removeStep(step.id)}>✕</button>
+              </div>
             </div>
             {step.type==='single'?(<>
               <div className="b-label">Exercise Name</div>
@@ -1529,33 +1649,90 @@ function ScheduleModal({dateStr,existing,onSave,onDelete,onClose,customWorkouts,
   );
 }
 
+// ─── LOG PAST WORKOUT MODAL ───────────────────────────────────────────────────
+function LogPastWorkoutModal({dateStr,onSave,onClose,customWorkouts}) {
+  const [categoryId,setCategoryId]=useState('lower');
+  const [workoutId,setWorkoutId]=useState(null);
+  const [dur,setDur]=useState('45');
+  const displayDate=new Date(dateStr+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});
+  const catWorkouts=[...(CATEGORIES[categoryId]?.workouts||[]),...(customWorkouts||[]).filter(w=>w.categoryId===categoryId)];
+  const col=COLORS[categoryId];
+  const save=()=>{
+    const mins=parseInt(dur)||1;
+    onSave(categoryId,workoutId,mins);
+  };
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
+        <div className="modal-handle"/>
+        <div className="modal-title">📝 Log Workout</div>
+        <div style={{textAlign:'center',fontSize:13,color:'var(--muted)',marginBottom:20,fontWeight:600}}>{displayDate}</div>
+        <div style={{fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:1,color:'var(--muted)',marginBottom:8}}>Category</div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:16}}>
+          {Object.entries(CATEGORIES).map(([key,cat])=>(
+            <button key={key} style={{background:categoryId===key?COLORS[key].bg:'var(--bg2)',color:categoryId===key?COLORS[key].text:'var(--text)',border:'none',borderRadius:50,padding:'8px 16px',fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}} onClick={()=>{setCategoryId(key);setWorkoutId(null);}}>{cat.emoji} {cat.label}</button>
+          ))}
+        </div>
+        <div style={{fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:1,color:'var(--muted)',marginBottom:8}}>Workout</div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:8,marginBottom:20}}>
+          <button style={{background:workoutId===null?col.bg:'var(--bg2)',color:workoutId===null?col.text:'var(--text)',border:'none',borderRadius:50,padding:'8px 16px',fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}} onClick={()=>setWorkoutId(null)}>Any {CATEGORIES[categoryId]?.label}</button>
+          {catWorkouts.map(w=>(
+            <button key={w.id} style={{background:workoutId===w.id?col.bg:'var(--bg2)',color:workoutId===w.id?col.text:'var(--text)',border:'none',borderRadius:50,padding:'8px 16px',fontFamily:'Inter,sans-serif',fontSize:13,fontWeight:700,cursor:'pointer'}} onClick={()=>setWorkoutId(w.id)}>{w.emoji} {w.label}</button>
+          ))}
+        </div>
+        <div className="form-group"><label className="form-label">Duration (minutes)</label><input className="form-input" type="number" min="1" value={dur} onChange={e=>setDur(e.target.value)}/></div>
+        <div className="modal-actions"><button className="modal-cancel" onClick={onClose}>Cancel</button><button className="modal-save" onClick={save}>Log Workout</button></div>
+      </div>
+    </div>
+  );
+}
+
 // ─── CALENDAR ─────────────────────────────────────────────────────────────────
-function CalendarView({history,customWorkouts,cookingLog,onDeleteEntry,onEditEntry,onDeleteCookingEntry,scheduledItems,onAddSchedule,onDeleteSchedule,customRecipes}) {
-  const today=new Date();const yr=today.getFullYear(),mo=today.getMonth();
+function CalendarView({history,customWorkouts,cookingLog,onDeleteEntry,onEditEntry,onDeleteCookingEntry,scheduledItems,onAddSchedule,onDeleteSchedule,customRecipes,onLogPastWorkout}) {
+  const today=new Date();
   const todayStr=today.toISOString().split('T')[0];
-  const firstDay=new Date(yr,mo,1).getDay();const days=new Date(yr,mo+1,0).getDate();
+  const [viewYear,setViewYear]=useState(today.getFullYear());
+  const [viewMonth,setViewMonth]=useState(today.getMonth());
+  const firstDay=new Date(viewYear,viewMonth,1).getDay();
+  const days=new Date(viewYear,viewMonth+1,0).getDate();
   const wmap={};history.forEach(w=>{wmap[w.date]=w;});
   const cmap={};(cookingLog||[]).forEach(c=>{if(!cmap[c.date])cmap[c.date]=c;});
   const smap={};(scheduledItems||[]).forEach(s=>{if(!smap[s.date])smap[s.date]=[];smap[s.date].push(s);});
   const [editEntry,setEditEntry]=useState(null);
   const [schedModal,setSchedModal]=useState(null);
+  const [logModal,setLogModal]=useState(null);
+
+  const viewMonthStr=`${viewYear}-${String(viewMonth+1).padStart(2,'0')}`;
+  const monthHistory=history.filter(w=>w.date.startsWith(viewMonthStr));
+  const monthCooking=(cookingLog||[]).filter(c=>c.date.startsWith(viewMonthStr));
+
   const allEntries=[...history.map(e=>({...e,_type:'workout'})),...(cookingLog||[]).map(e=>({...e,_type:'cooking'}))].sort((a,b)=>b.date.localeCompare(a.date)||0);
   const upcoming=(scheduledItems||[]).filter(s=>s.date>=todayStr).sort((a,b)=>a.date.localeCompare(b.date));
+
+  const prevMonth=()=>{if(viewMonth===0){setViewYear(y=>y-1);setViewMonth(11);}else{setViewMonth(m=>m-1);}};
+  const nextMonth=()=>{if(viewMonth===11){setViewYear(y=>y+1);setViewMonth(0);}else{setViewMonth(m=>m+1);}};
+  const monthLabel=new Date(viewYear,viewMonth,1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
+
   return (<>
     {editEntry&&<EditWorkoutModal entry={editEntry} onSave={(id,mins)=>{onEditEntry(id,mins);setEditEntry(null);}} onClose={()=>setEditEntry(null)} customWorkouts={customWorkouts}/>}
     {schedModal&&<ScheduleModal dateStr={schedModal} existing={smap[schedModal]||[]} onSave={item=>{onAddSchedule(item);}} onDelete={id=>onDeleteSchedule(id)} onClose={()=>setSchedModal(null)} customWorkouts={customWorkouts} customRecipes={customRecipes}/>}
+    {logModal&&<LogPastWorkoutModal dateStr={logModal} onSave={(catId,wId,mins)=>{onLogPastWorkout(logModal,catId,wId,mins);setLogModal(null);}} onClose={()=>setLogModal(null)} customWorkouts={customWorkouts}/>}
     <div style={{marginBottom:24,marginTop:28}}>
-      <div style={{fontSize:32,fontWeight:900,letterSpacing:'-1.5px',marginBottom:4}}>{today.toLocaleDateString('en-US',{month:'long',year:'numeric'})}</div>
-      <div style={{fontSize:14,fontWeight:500,color:'var(--muted)'}}>{history.length} workout{history.length!==1?'s':''} · {(cookingLog||[]).length} recipe{(cookingLog||[]).length!==1?'s':''} cooked</div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+        <button onClick={prevMonth} style={{background:'var(--bg2)',border:'none',borderRadius:10,width:38,height:38,fontSize:20,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Inter,sans-serif',color:'var(--text)'}}>‹</button>
+        <div style={{fontSize:26,fontWeight:900,letterSpacing:'-1px'}}>{monthLabel}</div>
+        <button onClick={nextMonth} style={{background:'var(--bg2)',border:'none',borderRadius:10,width:38,height:38,fontSize:20,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',fontFamily:'Inter,sans-serif',color:'var(--text)'}}>›</button>
+      </div>
+      <div style={{textAlign:'center',fontSize:14,fontWeight:500,color:'var(--muted)'}}>{monthHistory.length} workout{monthHistory.length!==1?'s':''} · {monthCooking.length} recipe{monthCooking.length!==1?'s':''} cooked</div>
     </div>
     <div className="cal-grid">
       {['S','M','T','W','T','F','S'].map((d,i)=><div key={i} className="cal-hdr">{d}</div>)}
       {Array.from({length:firstDay}).map((_,i)=><div key={'e'+i} className="cal-day empty"/>)}
       {Array.from({length:days}).map((_,i)=>{
         const d=i+1;
-        const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const ds=`${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const wEntry=wmap[ds];const cEntry=cmap[ds];const schedList=smap[ds]||[];
-        const isToday=ds===todayStr;const isFuture=ds>=todayStr;
+        const isToday=ds===todayStr;const isFuture=ds>todayStr;const isPast=ds<todayStr;
         let bg,col,extraStyle={};
         if(wEntry&&cEntry){const wc=COLORS[wEntry.categoryId];bg=`linear-gradient(135deg,${wc.bg} 55%,#4ECDC4 55%)`;col='#fff';}
         else if(wEntry){const wc=COLORS[wEntry.categoryId];bg=wc.bg;col=wc.text;}
@@ -1566,8 +1743,8 @@ function CalendarView({history,customWorkouts,cookingLog,onDeleteEntry,onEditEnt
         }
         const isActive=wEntry||cEntry;
         return <div key={d} className={`cal-day ${isActive?'worked':''} ${isToday?'today':''}`}
-          style={{...(isActive?{background:bg,color:col}:{}), ...extraStyle, cursor:isFuture?'pointer':'default'}}
-          onClick={()=>{if(isFuture)setSchedModal(ds);}}
+          style={{...(isActive?{background:bg,color:col}:{}), ...extraStyle, cursor:'pointer'}}
+          onClick={()=>{if(isFuture||isToday)setSchedModal(ds);else if(isPast)setLogModal(ds);}}
         >{d}</div>;
       })}
     </div>
@@ -2173,6 +2350,13 @@ function App() {
   const saveRecipeComment=(recipeId,comment)=>{setRecipeComments(prev=>{const updated={...prev,[recipeId]:comment};localStorage.setItem('cc-recipe-comments',JSON.stringify(updated));return updated;});};
   const deleteHistoryEntry=async id=>{setData(d=>({...d,history:d.history.filter(h=>h.id!==id)}));await sb.from('workout_history').delete().eq('id',id).eq('user_id',session.user.id);};
   const editHistoryEntry=async(id,mins)=>{setData(d=>({...d,history:d.history.map(h=>h.id===id?{...h,duration:mins}:h)}));await sb.from('workout_history').update({duration:mins}).eq('id',id).eq('user_id',session.user.id);};
+  const logPastWorkout=async(date,categoryId,workoutId,duration)=>{
+    try{
+      const {data:ins,error:e}=await sb.from('workout_history').insert({user_id:session.user.id,date,category_id:categoryId,workout_id:workoutId,duration,weight_log:{}}).select().single();
+      if(e)throw e;
+      setData(d=>({...d,history:[...d.history,{id:ins.id,date:ins.date,categoryId:ins.category_id,workoutId:ins.workout_id,duration:ins.duration}].sort((a,b)=>b.date.localeCompare(a.date))}));
+    }catch(e){setError('Could not save workout.');}
+  };
   const finishCooking=(photo,mins)=>{
     if(nav?.recipeId){
       const recipe=getRecipe(nav.recipeId,customRecipes);
@@ -2191,10 +2375,9 @@ function App() {
   const streak=(()=>{let s=0;const t=new Date();for(let i=0;i<60;i++){const d=new Date(t);d.setDate(t.getDate()-i);if(history.find(w=>w.date===d.toISOString().split('T')[0]))s++;else if(i>0)break;}return s;})();
   const weekCount=history.filter(w=>new Date()-new Date(w.date)<7*86400000).length;
   const weekMins=history.filter(w=>new Date()-new Date(w.date)<7*86400000).reduce((a,w)=>a+w.duration,0);
-  const hour=new Date().getHours();const greet=hour<12?'Morning':'Good afternoon'[0]>9?'Evening':'Afternoon';
+  const hour=new Date().getHours();
   const greetWord=hour<12?'Morning':hour<17?'Afternoon':'Evening';
   const firstName=profile.name?.split(' ')[0]||'there';
-  const weekDays=Array.from({length:7}).map((_,i)=>{const d=new Date();d.setDate(d.getDate()-6+i);const ds=d.toISOString().split('T')[0];return{label:['S','M','T','W','T','F','S'][d.getDay()],num:d.getDate(),ds,worked:!!history.find(w=>w.date===ds),isToday:i===6};});
   const weekKitchenCount=cookingLog.filter(e=>new Date()-new Date(e.date+'T00:00:00')<7*86400000).length;
   const recentAll=[...history.map(e=>({...e,_type:'workout'})),...cookingLog.map(e=>({...e,_type:'cooking'}))].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,4);
 
@@ -2250,7 +2433,7 @@ function App() {
             })}
           </div>
         </>)}
-        <CalendarView history={history} customWorkouts={custom} cookingLog={cookingLog} onDeleteEntry={deleteHistoryEntry} onEditEntry={editHistoryEntry} onDeleteCookingEntry={deleteCookingEntry} scheduledItems={scheduledItems} onAddSchedule={addScheduledItem} onDeleteSchedule={deleteScheduledItem} customRecipes={customRecipes}/>
+        <CalendarView history={history} customWorkouts={custom} cookingLog={cookingLog} onDeleteEntry={deleteHistoryEntry} onEditEntry={editHistoryEntry} onDeleteCookingEntry={deleteCookingEntry} scheduledItems={scheduledItems} onAddSchedule={addScheduledItem} onDeleteSchedule={deleteScheduledItem} customRecipes={customRecipes} onLogPastWorkout={logPastWorkout}/>
       </>)}
 
       {!nav&&tab==='fitness'&&(<>
