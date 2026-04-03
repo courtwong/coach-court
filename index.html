@@ -962,7 +962,7 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
       let best=dragFrom;
       rows.forEach(el=>{
         const idx=parseInt(el.dataset.dragidx);
-        if(idx<=curStepIdxRef.current)return;
+        if(idx<curStepIdxRef.current)return;
         const r=el.getBoundingClientRect();
         if(y>r.top+r.height/2)best=idx;
       });
@@ -999,10 +999,18 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
 
   const openReorder=()=>setModalSteps([...steps]);
   const cancelReorder=()=>{setModalSteps(null);setDragFrom(-1);setDragTo(-1);};
-  const doneReorder=()=>{setSteps(modalSteps);setModalSteps(null);setDragFrom(-1);setDragTo(-1);};
+  const doneReorder=()=>{
+    const curExercise=steps[curStepIdx];
+    const newIdx=modalSteps.indexOf(curExercise);
+    const newSeq=buildSeq(modalSteps);
+    const newSi=newSeq.findIndex(s=>s.stepIdx===newIdx&&s.setIdx===cur.setIdx);
+    setSteps(modalSteps);
+    if(newSi>=0)setSi(newSi);
+    setModalSteps(null);setDragFrom(-1);setDragTo(-1);
+  };
 
   const startDrag=(e,idx)=>{
-    if(idx<=curStepIdx)return;
+    if(idx<curStepIdx)return;
     e.preventDefault();
     setDragFrom(idx);setDragTo(idx);
   };
@@ -1055,7 +1063,7 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
             <div ref={listRef}>
               {displaySteps.map((step,displayIdx)=>{
                 const origIdx=steps.indexOf(step);
-                const isDoneOrCurrent=origIdx<=curStepIdx;
+                const isDoneOrCurrent=origIdx<curStepIdx;
                 const isDragging=dragFrom>=0&&origIdx===steps.indexOf(modalSteps[dragFrom]);
                 return (
                   <div key={origIdx} data-dragidx={displayIdx}
