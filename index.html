@@ -935,8 +935,14 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
   const [phase,setPhase]=useState('exercise');
   const [restInfo,setRestInfo]=useState({});
   const [weights,setWeights]=useState(()=>{const w={};workout.steps.forEach(s=>sNames(s).forEach(n=>{w[n]=weightHistory[n]||0;}));return w;});
-  const [showReorder,setShowReorder]=useState(false);
+  // reorder modal state
+  const [modalSteps,setModalSteps]=useState(null); // non-null = modal open
+  const [dragFrom,setDragFrom]=useState(-1);
+  const [dragTo,setDragTo]=useState(-1);
+  const listRef=useRef(null);
+  const curStepIdxRef=useRef(0);
   const startTime=useRef(Date.now());
+
   useEffect(()=>{
     let wakeLock=null;
     const requestWL=async()=>{try{if('wakeLock' in navigator)wakeLock=await navigator.wakeLock.request('screen');}catch(e){}};
@@ -945,17 +951,62 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
     document.addEventListener('visibilitychange',onVis);
     return()=>{wakeLock?.release();document.removeEventListener('visibilitychange',onVis);};
   },[]);
+
+  // Drag event listeners — attached only while a drag is active
+  useEffect(()=>{
+    if(dragFrom<0)return;
+    const onMove=e=>{
+      const y=e.touches?e.touches[0].clientY:e.clientY;
+      if(!listRef.current)return;
+      const rows=listRef.current.querySelectorAll('[data-dragidx]');
+      let best=dragFrom;
+      rows.forEach(el=>{
+        const idx=parseInt(el.dataset.dragidx);
+        if(idx<=curStepIdxRef.current)return;
+        const r=el.getBoundingClientRect();
+        if(y>r.top+r.height/2)best=idx;
+      });
+      setDragTo(best);
+      e.preventDefault();
+    };
+    const onEnd=()=>{
+      if(dragFrom>=0&&dragTo>=0&&dragFrom!==dragTo){
+        setModalSteps(s=>{
+          const a=[...s];const[item]=a.splice(dragFrom,1);a.splice(dragTo,0,item);return a;
+        });
+      }
+      setDragFrom(-1);setDragTo(-1);
+    };
+    document.addEventListener('touchmove',onMove,{passive:false});
+    document.addEventListener('touchend',onEnd);
+    document.addEventListener('mousemove',onMove);
+    document.addEventListener('mouseup',onEnd);
+    return()=>{
+      document.removeEventListener('touchmove',onMove);
+      document.removeEventListener('touchend',onEnd);
+      document.removeEventListener('mousemove',onMove);
+      document.removeEventListener('mouseup',onEnd);
+    };
+  },[dragFrom,dragTo]);
+
   const cur=seq[si]||seq[seq.length-1];
   const curStep=steps[cur.stepIdx];
   const curStepIdx=cur.stepIdx;
+  curStepIdxRef.current=curStepIdx;
   const isLastSeq=si>=seq.length-1;
   const isLastSet=cur.setIdx>=curStep.sets-1;
   const accentColor=col.bg==='#D4F54A'?'#8FB800':col.bg==='#C4A8FF'?'#7C4DFF':col.bg;
-  const moveUpcoming=(idx,dir)=>{
-    const target=idx+dir;
-    if(target<=curStepIdx||target>=steps.length||idx<=curStepIdx)return;
-    setSteps(s=>{const a=[...s];[a[idx],a[target]]=[a[target],a[idx]];return a;});
+
+  const openReorder=()=>setModalSteps([...steps]);
+  const cancelReorder=()=>{setModalSteps(null);setDragFrom(-1);setDragTo(-1);};
+  const doneReorder=()=>{setSteps(modalSteps);setModalSteps(null);setDragFrom(-1);setDragTo(-1);};
+
+  const startDrag=(e,idx)=>{
+    if(idx<=curStepIdx)return;
+    e.preventDefault();
+    setDragFrom(idx);setDragTo(idx);
   };
+
   const handleLog=()=>{
     sNames(curStep).forEach(n=>onUpdateWeight(n,weights[n]));
     if(isLastSeq){setPhase('done');return;}
@@ -963,6 +1014,7 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
     setRestInfo({seconds:isLastSet?120:90,type:isLastSet?'between-exercises':'between-sets',nextName:sLabel(nstep)+(ns.setIdx===0?'':` — Set ${ns.setIdx+1}`)});
     setPhase('rest');
   };
+
   if(phase==='done'){
     const mins=Math.max(1,Math.round((Date.now()-startTime.current)/60000));
     return (
@@ -980,35 +1032,53 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
     );
   }
   if(phase==='rest') return <RestScreen seconds={restInfo.seconds} restType={restInfo.type} nextName={restInfo.nextName} color={accentColor} onDone={()=>{setPhase('exercise');setSi(i=>i+1);}}/>;
+
+  // Live drag preview: show items in their dragged position
+  const displaySteps=modalSteps?[...modalSteps]:[];
+  if(dragFrom>=0&&dragTo>=0&&dragFrom!==dragTo){
+    const[item]=displaySteps.splice(dragFrom,1);displaySteps.splice(dragTo,0,item);
+  }
+
   const pct=(si/seq.length)*100;
   const upcoming=[];let last=curStepIdx;
   for(let i=si+1;i<seq.length;i++){const s=seq[i];if(s.stepIdx!==last){upcoming.push({step:steps[s.stepIdx],stepIdx:s.stepIdx});last=s.stepIdx;if(upcoming.length>=3)break;}}
-  const futureSteps=steps.slice(curStepIdx+1);
+  const hasFuture=steps.length>curStepIdx+1;
+
   return (
     <div className="ex-screen">
-      {showReorder&&(
-        <div className="modal-overlay" onClick={()=>setShowReorder(false)}>
+      {modalSteps&&(
+        <div className="modal-overlay" onClick={cancelReorder}>
           <div className="modal-sheet" onClick={e=>e.stopPropagation()}>
             <div className="modal-handle"/>
             <div className="modal-title">Reorder Exercises</div>
-            {steps.map((step,i)=>{
-              const isDoneOrCurrent=i<=curStepIdx;
-              const canUp=i>curStepIdx+1;
-              const canDown=i>curStepIdx&&i<steps.length-1;
-              return (
-                <div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 0',borderBottom:'1px solid var(--border)',opacity:isDoneOrCurrent?0.4:1}}>
-                  <div style={{width:24,height:24,borderRadius:8,background:isDoneOrCurrent?'var(--border)':accentColor,color:isDoneOrCurrent?'var(--muted)':'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,flexShrink:0}}>{i+1}</div>
-                  <div style={{flex:1,fontSize:14,fontWeight:700,color:'var(--text)'}}>{sLabel(step)}<span style={{fontSize:11,fontWeight:500,color:'var(--muted)',marginLeft:6}}>{step.sets}×{Array.isArray(step.reps)?step.reps[0]:step.reps}</span>{i===curStepIdx&&<span style={{marginLeft:8,fontSize:10,fontWeight:800,color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>Now</span>}</div>
-                  {!isDoneOrCurrent&&(
-                    <div style={{display:'flex',gap:4}}>
-                      <button onClick={()=>moveUpcoming(i,-1)} disabled={!canUp} style={{background:'var(--bg2)',border:'none',borderRadius:8,width:32,height:32,fontSize:16,cursor:canUp?'pointer':'default',opacity:canUp?1:0.25,fontFamily:'Inter,sans-serif'}}>↑</button>
-                      <button onClick={()=>moveUpcoming(i,1)} disabled={!canDown} style={{background:'var(--bg2)',border:'none',borderRadius:8,width:32,height:32,fontSize:16,cursor:canDown?'pointer':'default',opacity:canDown?1:0.25,fontFamily:'Inter,sans-serif'}}>↓</button>
+            <div style={{fontSize:12,color:'var(--muted)',fontWeight:500,textAlign:'center',marginBottom:16,marginTop:-8}}>Hold and drag the handle to reorder upcoming exercises</div>
+            <div ref={listRef}>
+              {displaySteps.map((step,displayIdx)=>{
+                const origIdx=steps.indexOf(step);
+                const isDoneOrCurrent=origIdx<=curStepIdx;
+                const isDragging=dragFrom>=0&&origIdx===steps.indexOf(modalSteps[dragFrom]);
+                return (
+                  <div key={origIdx} data-dragidx={displayIdx}
+                    style={{display:'flex',alignItems:'center',gap:12,padding:'12px 4px',borderBottom:'1px solid var(--border)',opacity:isDoneOrCurrent?0.35:1,background:isDragging?'var(--bg2)':'transparent',borderRadius:isDragging?12:0,transition:'background 0.1s'}}>
+                    {/* Drag handle */}
+                    <div
+                      onTouchStart={isDoneOrCurrent?undefined:e=>startDrag(e,displayIdx)}
+                      onMouseDown={isDoneOrCurrent?undefined:e=>startDrag(e,displayIdx)}
+                      style={{fontSize:18,color:isDoneOrCurrent?'var(--border)':'var(--muted)',cursor:isDoneOrCurrent?'default':'grab',padding:'0 4px',userSelect:'none',touchAction:'none',flexShrink:0}}>⠿</div>
+                    {/* Number badge */}
+                    <div style={{width:24,height:24,borderRadius:8,background:isDoneOrCurrent?'var(--border)':accentColor,color:isDoneOrCurrent?'var(--muted)':'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,flexShrink:0}}>{displayIdx+1}</div>
+                    {/* Name */}
+                    <div style={{flex:1,fontSize:14,fontWeight:700,color:'var(--text)'}}>
+                      {sLabel(step)}
+                      <span style={{fontSize:11,fontWeight:500,color:'var(--muted)',marginLeft:6}}>{step.sets}×{Array.isArray(step.reps)?step.reps[0]:step.reps}</span>
+                      {origIdx===curStepIdx&&<span style={{marginLeft:8,fontSize:10,fontWeight:800,color:accentColor,textTransform:'uppercase',letterSpacing:'0.5px'}}>Now</span>}
                     </div>
-                  )}
-                </div>
-              );
-            })}
-            <div className="modal-actions"><button className="modal-save" style={{width:'100%'}} onClick={()=>setShowReorder(false)}>Done</button></div>
+                  </div>
+                );
+              })}
+            </div>
+            <button className="modal-save" style={{width:'100%',marginTop:20}} onClick={doneReorder}>Done</button>
+            <button className="modal-cancel" style={{width:'100%',marginTop:8,textAlign:'center'}} onClick={cancelReorder}>Cancel</button>
           </div>
         </div>
       )}
@@ -1059,7 +1129,7 @@ function WorkoutFlow({categoryId,workoutId,onFinish,onBack,weightHistory,onUpdat
       <div className="ex-footer">
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
           <div className="upcoming-title" style={{marginBottom:0}}>Coming Up</div>
-          {futureSteps.length>0&&<button onClick={()=>setShowReorder(true)} style={{background:'var(--bg2)',border:'none',borderRadius:8,padding:'4px 10px',fontSize:11,fontWeight:700,color:'var(--muted)',cursor:'pointer',fontFamily:'Inter,sans-serif'}}>Reorder</button>}
+          {hasFuture&&<button onClick={openReorder} style={{background:accentColor,border:'none',borderRadius:10,padding:'6px 14px',fontSize:12,fontWeight:800,color:'#fff',cursor:'pointer',fontFamily:'Inter,sans-serif',letterSpacing:'0.2px'}}>Reorder ⠿</button>}
         </div>
         {!isLastSet&&<div className="upcoming-row"><div className="up-dot" style={{background:accentColor}}/><div className="up-name">{sLabel(curStep)}</div><div className="up-meta">Set {cur.setIdx+2}/{curStep.sets}</div></div>}
         {upcoming.map(({step,stepIdx},i)=><div key={stepIdx} className="upcoming-row" style={{opacity:1-i*0.2}}><div className="up-dot"/><div className="up-name">{sLabel(step)}</div><div className="up-meta">{step.sets}×{Array.isArray(step.reps)?step.reps[0]:step.reps}</div></div>)}
